@@ -5,7 +5,10 @@ import { desc } from 'drizzle-orm';
 export const metadata = { title: 'Messages — Admin' };
 
 export default async function MessagesPage() {
-  const messages = await db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt)).limit(100);
+  let messages: (typeof contactMessages.$inferSelect)[] = [];
+  try {
+    messages = await db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt)).limit(100);
+  } catch {}
 
   return (
     <div>

@@ -3,14 +3,20 @@ import { db } from '@/lib/db';
 import { products } from '@/lib/schema';
 import { eq, desc } from 'drizzle-orm';
 import ProductCard from '@/components/ui/ProductCard';
+import type { Product } from '@/lib/schema';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const featured = await db.select().from(products)
-    .where(eq(products.active, true))
-    .orderBy(desc(products.createdAt))
-    .limit(8);
+  let featured: Product[] = [];
+  try {
+    featured = await db.select().from(products)
+      .where(eq(products.active, true))
+      .orderBy(desc(products.createdAt))
+      .limit(8);
+  } catch {
+    // DB not ready yet — page still renders without products
+  }
 
   return (
     <>

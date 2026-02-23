@@ -4,19 +4,28 @@ import { eq, sql } from 'drizzle-orm';
 
 export const metadata = { title: 'Tableau de bord' };
 
+async function count(query: Promise<{ total: number }[]>): Promise<number> {
+  try {
+    const [r] = await query;
+    return r?.total ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 export default async function AdminDashboard() {
-  const [[{ total: totalProducts }], [{ total: activeProducts }], [{ total: totalUsers }], [{ total: unreadMessages }]] = await Promise.all([
-    db.select({ total: sql<number>`count(*)::int` }).from(products),
-    db.select({ total: sql<number>`count(*)::int` }).from(products).where(eq(products.active, true)),
-    db.select({ total: sql<number>`count(*)::int` }).from(users),
-    db.select({ total: sql<number>`count(*)::int` }).from(contactMessages).where(eq(contactMessages.status, 'nouveau')),
+  const [totalProducts, activeProducts, totalUsers, unreadMessages] = await Promise.all([
+    count(db.select({ total: sql<number>`count(*)::int` }).from(products)),
+    count(db.select({ total: sql<number>`count(*)::int` }).from(products).where(eq(products.active, true))),
+    count(db.select({ total: sql<number>`count(*)::int` }).from(users)),
+    count(db.select({ total: sql<number>`count(*)::int` }).from(contactMessages).where(eq(contactMessages.status, 'nouveau'))),
   ]);
 
   const cards = [
-    { label: 'Produits total',      value: totalProducts,  icon: '📦', href: '/admin/products' },
-    { label: 'Produits actifs',     value: activeProducts, icon: '✅', href: '/admin/products?active=1' },
-    { label: 'Utilisateurs',        value: totalUsers,     icon: '👥', href: '/admin/users' },
-    { label: 'Messages non lus',    value: unreadMessages, icon: '✉️', href: '/admin/messages', alert: unreadMessages > 0 },
+    { label: 'Produits total',   value: totalProducts,  icon: '📦', href: '/admin/products' },
+    { label: 'Produits actifs',  value: activeProducts, icon: '✅', href: '/admin/products?active=1' },
+    { label: 'Utilisateurs',     value: totalUsers,     icon: '👥', href: '/admin/users' },
+    { label: 'Messages non lus', value: unreadMessages, icon: '✉️', href: '/admin/messages', alert: unreadMessages > 0 },
   ];
 
   return (
@@ -31,7 +40,6 @@ export default async function AdminDashboard() {
           </a>
         ))}
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <a href="/admin/products/new" className="bg-purple-700 text-white rounded-xl p-5 hover:bg-purple-800 transition-colors">
           <div className="text-2xl mb-2">➕</div>

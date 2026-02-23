@@ -14,7 +14,10 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
   if (sp.active) filters.push(eq(products.active, true));
   const where = filters.length ? and(...filters) : undefined;
 
-  const items = await db.select().from(products).where(where).orderBy(products.id).limit(200);
+  let items: (typeof products.$inferSelect)[] = [];
+  try {
+    items = await db.select().from(products).where(where).orderBy(products.id).limit(200);
+  } catch {}
 
   return (
     <div>
