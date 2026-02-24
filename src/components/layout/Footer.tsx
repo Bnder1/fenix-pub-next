@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="bg-gray-900 text-gray-400 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
-          <div className="text-white font-bold text-lg mb-3">FÉNIX<span className="text-pink-400">PUB</span></div>
+          <div className="text-white font-bold text-lg mb-3">FENIX<span className="text-pink-400">PUB</span></div>
           <p className="text-sm leading-relaxed">Votre partenaire en objets publicitaires personnalisés. Qualité, rapidité, créativité.</p>
         </div>
         <div>
@@ -20,8 +20,9 @@ export default function Footer() {
           <div className="text-white font-semibold mb-3">Contact</div>
           <ul className="space-y-2 text-sm">
             <li>guilhem@fenix-pub.fr</li>
-            <li>+33 1 23 45 67 89</li>
-            <li>Paris, France</li>
+            <li>+33 (0) 7 65 75 74 98</li>
+            <li>SARL FENIXPUB</li>
+            <li>45 rue Hector Berlioz, 69009 LYON</li>
           </ul>
         </div>
       </div>
