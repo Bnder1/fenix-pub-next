@@ -27,7 +27,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-gray-800 text-center text-xs py-4 text-gray-600">
-        © {new Date().getFullYear()} FÉNIX PUB — Tous droits réservés
+        © {new Date().getFullYear()} FENIX PUB — Tous droits réservés
       </div>
     </footer>
   );
