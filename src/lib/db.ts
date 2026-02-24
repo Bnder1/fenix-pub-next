@@ -10,7 +10,8 @@ let _instance: DbInstance | null = null;
 
 function getInstance(): DbInstance {
   if (!_instance) {
-    _instance = drizzle(neon(process.env.DATABASE_URL!), { schema });
+    const url = process.env.NETLIFY_DATABASE_URL ?? process.env.DATABASE_URL;
+    _instance = drizzle(neon(url!), { schema });
   }
   return _instance;
 }
