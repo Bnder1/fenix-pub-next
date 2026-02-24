@@ -31,7 +31,7 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold text-purple-700">FÉNIX<span className="text-pink-500">PUB</span></Link>
+          <Link href="/" className="text-2xl font-bold text-purple-700">FENIX<span className="text-pink-500">PUB</span></Link>
           <p className="text-gray-500 mt-2 text-sm">Connectez-vous à votre compte</p>
         </div>
 
