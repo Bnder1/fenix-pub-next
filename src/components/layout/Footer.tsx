@@ -19,7 +19,7 @@ export default function Footer() {
         <div>
           <div className="text-white font-semibold mb-3">Contact</div>
           <ul className="space-y-2 text-sm">
-            <li>contact@fenixpub.fr</li>
+            <li>guilhem@fenix-pub.fr</li>
             <li>+33 1 23 45 67 89</li>
             <li>Paris, France</li>
           </ul>
