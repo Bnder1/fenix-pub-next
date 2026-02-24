@@ -15,9 +15,6 @@ export default function Footer() {
             <li><Link href="/catalogue" className="hover:text-white transition-colors">Catalogue</Link></li>
             <li><Link href="/documents" className="hover:text-white transition-colors">Documents</Link></li>
             <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-            <li className="pt-2 border-t border-gray-800"><Link href="/cgv" className="hover:text-white transition-colors">CGV</Link></li>
-            <li><Link href="/mentions-legales" className="hover:text-white transition-colors">Mentions légales</Link></li>
-            <li><Link href="/confidentialite" className="hover:text-white transition-colors">Confidentialité</Link></li>
           </ul>
         </div>
         <div>
@@ -30,8 +27,15 @@ export default function Footer() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-gray-800 text-center text-xs py-4 text-gray-600">
-        © {new Date().getFullYear()} FENIX PUB — Tous droits réservés
+      <div className="border-t border-gray-800 py-4 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-600">
+          <span>© {new Date().getFullYear()} FENIX PUB — Tous droits réservés</span>
+          <div className="flex gap-4">
+            <Link href="/cgv" className="hover:text-gray-400 transition-colors">CGV</Link>
+            <Link href="/mentions-legales" className="hover:text-gray-400 transition-colors">Mentions légales</Link>
+            <Link href="/confidentialite" className="hover:text-gray-400 transition-colors">Confidentialité</Link>
+          </div>
+        </div>
       </div>
     </footer>
   );

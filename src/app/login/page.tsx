@@ -2,13 +2,13 @@
 
 import { signIn } from 'next-auth/react';
 import { useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 function LoginForm() {
-  const params   = useSearchParams();
-  const router   = useRouter();
-  const redirect = params.get('redirect') ?? '/';
+  const params      = useSearchParams();
+  const redirect    = params.get('redirect') ?? '/';
+  const registered  = params.get('registered') === '1';
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
@@ -18,11 +18,16 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const res = await signIn('credentials', { email, password, redirect: false });
-    setLoading(false);
-    if (res?.ok) {
-      router.push(redirect);
-    } else {
+    try {
+      const res = await signIn('credentials', { email, password, redirect: false });
+      setLoading(false);
+      if (res?.ok) {
+        window.location.href = redirect; // hard reload — session cookie must be re-read
+      } else {
+        setError('Email ou mot de passe incorrect.');
+      }
+    } catch {
+      setLoading(false);
       setError('Email ou mot de passe incorrect.');
     }
   }
@@ -34,6 +39,12 @@ function LoginForm() {
           <Link href="/" className="text-2xl font-bold text-purple-700">FENIX<span className="text-pink-500">PUB</span></Link>
           <p className="text-gray-500 mt-2 text-sm">Connectez-vous à votre compte</p>
         </div>
+
+        {registered && (
+          <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm mb-4">
+            Compte créé ! Connectez-vous ci-dessous.
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">{error}</div>

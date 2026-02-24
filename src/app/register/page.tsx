@@ -28,8 +28,16 @@ export default function RegisterPage() {
       setError(d.error ?? 'Erreur lors de la création du compte.');
       setLoading(false); return;
     }
-    await signIn('credentials', { email: form.email, password: form.password, redirect: false });
-    router.push('/catalogue');
+    try {
+      const loginRes = await signIn('credentials', { email: form.email, password: form.password, redirect: false });
+      if (loginRes?.ok) {
+        window.location.href = '/catalogue'; // hard reload — session cookie must be re-read
+      } else {
+        router.push('/login?registered=1');
+      }
+    } catch {
+      router.push('/login?registered=1');
+    }
   }
 
   return (
