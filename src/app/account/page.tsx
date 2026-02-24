@@ -69,16 +69,30 @@ export default async function AccountPage() {
                 {myOrders.map(({ order: o }) => (
                   <div key={o.id} className="py-3 flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Commande #{o.id}</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        Commande {o.orderNumber ? `n° ${o.orderNumber}` : `#${o.id}`}
+                      </div>
                       <div className="text-xs text-gray-400">{o.createdAt?.toLocaleDateString('fr-FR')}</div>
                     </div>
                     <div className="flex items-center gap-3">
                       {o.total && <span className="text-sm font-semibold text-purple-700">{parseFloat(String(o.total)).toFixed(2)} €</span>}
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        o.status === 'pending'   ? 'bg-yellow-50 text-yellow-700' :
-                        o.status === 'confirmed' ? 'bg-green-50 text-green-700'  :
+                        o.status === 'pending'    ? 'bg-yellow-50 text-yellow-700'  :
+                        o.status === 'confirmed'  ? 'bg-blue-50 text-blue-700'      :
+                        o.status === 'processing' ? 'bg-orange-50 text-orange-700'  :
+                        o.status === 'shipped'    ? 'bg-purple-50 text-purple-700'  :
+                        o.status === 'delivered'  ? 'bg-green-50 text-green-700'    :
+                        o.status === 'cancelled'  ? 'bg-red-50 text-red-600'        :
                         'bg-gray-100 text-gray-500'
-                      }`}>{o.status}</span>
+                      }`}>{
+                        o.status === 'pending'    ? 'En attente'      :
+                        o.status === 'confirmed'  ? 'Confirmée'       :
+                        o.status === 'processing' ? 'En préparation'  :
+                        o.status === 'shipped'    ? 'Expédiée'        :
+                        o.status === 'delivered'  ? 'Livrée'          :
+                        o.status === 'cancelled'  ? 'Annulée'         :
+                        o.status ?? 'En attente'
+                      }</span>
                     </div>
                   </div>
                 ))}

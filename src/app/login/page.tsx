@@ -24,11 +24,18 @@ function LoginForm() {
       if (res?.ok) {
         window.location.href = redirect; // hard reload — session cookie must be re-read
       } else {
-        setError('Email ou mot de passe incorrect.');
+        const code = res?.error ?? '';
+        if (code === 'CredentialsSignin' || code === '') {
+          setError('Email ou mot de passe incorrect.');
+        } else if (code === 'Configuration') {
+          setError('Erreur de configuration serveur. Contactez l\'administrateur.');
+        } else {
+          setError('Erreur de connexion — réessayez dans un instant.');
+        }
       }
     } catch {
       setLoading(false);
-      setError('Email ou mot de passe incorrect.');
+      setError('Erreur de connexion — vérifiez votre connexion internet.');
     }
   }
 

@@ -69,6 +69,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/documents" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
             📄 Documents
           </Link>
+          <Link href="/admin/pages" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
+            📝 Pages CMS
+          </Link>
 
           <div className="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">Config</div>
           <Link href="/admin/settings" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
