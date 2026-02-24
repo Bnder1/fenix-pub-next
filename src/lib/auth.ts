@@ -6,7 +6,8 @@ import { users } from './schema';
 import { eq } from 'drizzle-orm';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // NextAuth v5 utilise AUTH_SECRET (priorité) ou NEXTAUTH_SECRET
+  // NextAuth v5 — trustHost requis derrière les proxies (Netlify, Vercel, etc.)
+  trustHost: true,
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({

@@ -21,6 +21,7 @@ export const products = pgTable('products', {
   image:           text('image'),
   images:          json('images').$type<string[]>().default([]),
   variants:        json('variants').$type<Variant[]>().default([]),
+  sizes:           json('sizes').$type<string[]>().default([]),
   colors:          text('colors'),
   printTechniques: text('print_techniques'),
   printable:       boolean('printable').default(false),
@@ -46,16 +47,16 @@ export const categories = pgTable('categories', {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const users = pgTable('users', {
-  id:           serial('id').primaryKey(),
-  name:         varchar('name', { length: 150 }).notNull(),
-  email:        varchar('email', { length: 255 }).notNull().unique(),
-  password:     varchar('password', { length: 255 }).notNull(),
-  company:      varchar('company', { length: 150 }),
-  phone:        varchar('phone', { length: 30 }),
-  role:         varchar('role', { length: 20 }).default('client'),
-  active:       boolean('active').default(true),
-  createdAt:    timestamp('created_at').defaultNow(),
-  updatedAt:    timestamp('updated_at').defaultNow(),
+  id:        serial('id').primaryKey(),
+  name:      varchar('name', { length: 150 }).notNull(),
+  email:     varchar('email', { length: 255 }).notNull().unique(),
+  password:  varchar('password', { length: 255 }).notNull(),
+  company:   varchar('company', { length: 150 }),
+  phone:     varchar('phone', { length: 30 }),
+  role:      varchar('role', { length: 20 }).default('client'),
+  active:    boolean('active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // ─── Favorites ───────────────────────────────────────────────────────────────
@@ -64,9 +65,7 @@ export const favorites = pgTable('favorites', {
   userId:    integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
-}, (t) => [
-  unique('favorites_user_product_unique').on(t.userId, t.productId),
-]);
+}, (t) => [unique('favorites_user_product_unique').on(t.userId, t.productId)]);
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
 export const cartItems = pgTable('cart_items', {
@@ -74,46 +73,60 @@ export const cartItems = pgTable('cart_items', {
   userId:    integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
   qty:       integer('qty').notNull().default(1),
+  size:      varchar('size', { length: 20 }),
+  color:     varchar('color', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-}, (t) => [
-  unique('cart_user_product_unique').on(t.userId, t.productId),
-]);
+});
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export const orders = pgTable('orders', {
-  id:         serial('id').primaryKey(),
-  userId:     integer('user_id').references(() => users.id, { onDelete: 'set null' }),
-  status:     varchar('status', { length: 50 }).default('pending'),
-  total:      numeric('total', { precision: 10, scale: 2 }),
-  notes:      text('notes'),
-  createdAt:  timestamp('created_at').defaultNow(),
-  updatedAt:  timestamp('updated_at').defaultNow(),
+  id:        serial('id').primaryKey(),
+  userId:    integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  status:    varchar('status', { length: 50 }).default('pending'),
+  total:     numeric('total', { precision: 10, scale: 2 }),
+  notes:     text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const orderItems = pgTable('order_items', {
-  id:         serial('id').primaryKey(),
-  orderId:    integer('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
-  productId:  integer('product_id').references(() => products.id, { onDelete: 'set null' }),
-  productRef: varchar('product_ref', { length: 100 }),
-  productName:varchar('product_name', { length: 255 }),
-  qty:        integer('qty').notNull(),
-  unitPrice:  numeric('unit_price', { precision: 10, scale: 2 }),
+  id:          serial('id').primaryKey(),
+  orderId:     integer('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  productId:   integer('product_id').references(() => products.id, { onDelete: 'set null' }),
+  productRef:  varchar('product_ref', { length: 100 }),
+  productName: varchar('product_name', { length: 255 }),
+  qty:         integer('qty').notNull(),
+  size:        varchar('size', { length: 20 }),
+  color:       varchar('color', { length: 100 }),
+  unitPrice:   numeric('unit_price', { precision: 10, scale: 2 }),
 });
 
 // ─── Contact Messages ─────────────────────────────────────────────────────────
 export const contactMessages = pgTable('contact_messages', {
-  id:        serial('id').primaryKey(),
-  name:      varchar('name', { length: 150 }).notNull(),
-  email:     varchar('email', { length: 255 }).notNull(),
-  company:   varchar('company', { length: 150 }),
-  phone:     varchar('phone', { length: 30 }),
-  subject:   varchar('subject', { length: 255 }),
-  message:   text('message').notNull(),
-  productRef:varchar('product_ref', { length: 100 }),
-  status:    varchar('status', { length: 30 }).default('nouveau'),
-  notes:     text('notes'),
-  createdAt: timestamp('created_at').defaultNow(),
+  id:         serial('id').primaryKey(),
+  name:       varchar('name', { length: 150 }).notNull(),
+  email:      varchar('email', { length: 255 }).notNull(),
+  company:    varchar('company', { length: 150 }),
+  phone:      varchar('phone', { length: 30 }),
+  subject:    varchar('subject', { length: 255 }),
+  message:    text('message').notNull(),
+  productRef: varchar('product_ref', { length: 100 }),
+  status:     varchar('status', { length: 30 }).default('nouveau'),
+  notes:      text('notes'),
+  createdAt:  timestamp('created_at').defaultNow(),
+});
+
+// ─── CMS Pages ────────────────────────────────────────────────────────────────
+export const cmsPages = pgTable('cms_pages', {
+  id:          serial('id').primaryKey(),
+  slug:        varchar('slug', { length: 120 }).notNull().unique(),
+  title:       varchar('title', { length: 255 }).notNull(),
+  content:     text('content'),
+  metaDesc:    varchar('meta_description', { length: 300 }),
+  published:   boolean('published').default(false),
+  createdAt:   timestamp('created_at').defaultNow(),
+  updatedAt:   timestamp('updated_at').defaultNow(),
 });
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -125,14 +138,18 @@ export const settings = pgTable('settings', {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Variant = {
-  color: string;
+  color:      string;
   color_code?: string;
-  pms_color?: string;
-  sku?: string;
-  gtin?: string;
-  status?: string;
-  image?: string;
+  pms_color?:  string;
+  sku?:        string;
+  gtin?:       string;
+  status?:     string;
+  image?:      string;
+  sizes?:      string[];
 };
 
-export type Product = typeof products.$inferSelect;
-export type User    = typeof users.$inferSelect;
+export type Product          = typeof products.$inferSelect;
+export type User             = typeof users.$inferSelect;
+export type CmsPage          = typeof cmsPages.$inferSelect;
+export type ContactMessage   = typeof contactMessages.$inferSelect;
+export type Order            = typeof orders.$inferSelect;

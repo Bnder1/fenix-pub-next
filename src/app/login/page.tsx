@@ -58,7 +58,7 @@ function LoginForm() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Pas encore de compte ?{' '}
-          <Link href="/contact" className="text-purple-700 hover:underline">Contactez-nous</Link>
+          <Link href="/register" className="text-purple-700 hover:underline">Créer un compte</Link>
         </p>
       </div>
     </div>
