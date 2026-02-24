@@ -65,8 +65,8 @@ export default async function CartPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-right">
               <div className="text-lg font-bold text-gray-900 mb-4">Total estimé : {formatPrice(total)} € HT</div>
               <p className="text-xs text-gray-400 mb-4">Prix indicatifs — un devis définitif vous sera adressé.</p>
-              <a href="/contact" className="px-8 py-3 bg-purple-700 text-white rounded-xl font-semibold hover:bg-purple-800 transition-colors">
-                Valider & demander un devis
+              <a href="/commande" className="px-8 py-3 bg-purple-700 text-white rounded-xl font-semibold hover:bg-purple-800 transition-colors">
+                Passer la commande →
               </a>
             </div>
           )}

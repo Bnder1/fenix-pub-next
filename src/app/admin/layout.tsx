@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { contactMessages } from '@/lib/schema';
+import { contactMessages, orders } from '@/lib/schema';
 import { eq, sql } from 'drizzle-orm';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -11,9 +11,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user || user.role !== 'admin') redirect('/login');
 
   let unread = 0;
+  let pendingOrders = 0;
   try {
     const [r] = await db.select({ count: sql<number>`count(*)` }).from(contactMessages).where(eq(contactMessages.status, 'nouveau'));
     unread = Number(r?.count ?? 0);
+    const [o] = await db.select({ count: sql<number>`count(*)` }).from(orders).where(eq(orders.status, 'pending'));
+    pendingOrders = Number(o?.count ?? 0);
   } catch {}
 
   return (
@@ -21,10 +24,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {/* Sidebar */}
       <aside className="w-56 bg-gray-900 text-gray-300 flex flex-col shrink-0">
         <div className="p-4 border-b border-gray-800">
-          <Link href="/" className="text-white font-bold text-lg">FÉNIX<span className="text-pink-400">PUB</span></Link>
+          <Link href="/" className="text-white font-bold text-lg">FENIX<span className="text-pink-400">PUB</span></Link>
           <div className="text-xs text-gray-500 mt-0.5">Administration</div>
         </div>
-        <nav className="flex-1 p-3 space-y-1 text-sm">
+        <nav className="flex-1 p-3 space-y-1 text-sm overflow-y-auto">
           <Link href="/admin" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
             📊 Tableau de bord
           </Link>
@@ -40,6 +43,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             🗂️ Catégories
           </Link>
 
+          <div className="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">Commerce</div>
+          <Link href="/admin/orders" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
+            🛒 Commandes
+            {pendingOrders > 0 && (
+              <span className="ml-auto bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{pendingOrders}</span>
+            )}
+          </Link>
+
           <div className="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">Clients</div>
           <Link href="/admin/users" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
             👥 Utilisateurs
@@ -49,6 +60,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             {unread > 0 && (
               <span className="ml-auto bg-orange-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{unread}</span>
             )}
+          </Link>
+
+          <div className="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">Contenu</div>
+          <Link href="/admin/testimonials" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
+            ⭐ Témoignages
+          </Link>
+          <Link href="/admin/documents" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
+            📄 Documents
           </Link>
 
           <div className="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">Config</div>

@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import Image from 'next/image';
 import AddToCartButton from './AddToCartButton';
+import FavoriteButton from './FavoriteButton';
 
 export async function generateMetadata({ params }: { params: Promise<{ ref: string }> }) {
   const { ref } = await params;
@@ -148,7 +149,10 @@ export default async function ProductPage({ params }: { params: Promise<{ ref: s
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3">
             {session ? (
-              <AddToCartButton productId={product.id} moq={product.moq ?? 1} />
+              <>
+                <AddToCartButton productId={product.id} moq={product.moq ?? 1} />
+                <FavoriteButton productId={product.id} />
+              </>
             ) : (
               <>
                 <Link href={`/login?redirect=/produit/${product.ref}`} className="flex-1 text-center px-6 py-3 bg-purple-700 text-white rounded-xl font-semibold hover:bg-purple-800 transition-colors">

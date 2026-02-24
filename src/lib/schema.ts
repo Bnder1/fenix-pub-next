@@ -38,11 +38,15 @@ export const products = pgTable('products', {
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 export const categories = pgTable('categories', {
-  id:        serial('id').primaryKey(),
-  name:      varchar('name', { length: 100 }).notNull().unique(),
-  slug:      varchar('slug', { length: 120 }).notNull().unique(),
-  sortOrder: integer('sort_order').default(0),
-  createdAt: timestamp('created_at').defaultNow(),
+  id:          serial('id').primaryKey(),
+  name:        varchar('name', { length: 100 }).notNull().unique(),
+  slug:        varchar('slug', { length: 120 }).notNull().unique(),
+  icon:        varchar('icon', { length: 10 }).default('🗂️'),
+  description: text('description'),
+  fromPrice:   varchar('from_price', { length: 50 }),
+  sortOrder:   integer('sort_order').default(0),
+  active:      boolean('active').default(true),
+  createdAt:   timestamp('created_at').defaultNow(),
 });
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -81,13 +85,20 @@ export const cartItems = pgTable('cart_items', {
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export const orders = pgTable('orders', {
-  id:        serial('id').primaryKey(),
-  userId:    integer('user_id').references(() => users.id, { onDelete: 'set null' }),
-  status:    varchar('status', { length: 50 }).default('pending'),
-  total:     numeric('total', { precision: 10, scale: 2 }),
-  notes:     text('notes'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  id:              serial('id').primaryKey(),
+  orderNumber:     varchar('order_number', { length: 30 }).unique(),
+  userId:          integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  status:          varchar('status', { length: 50 }).default('pending'),
+  total:           numeric('total', { precision: 10, scale: 2 }),
+  notes:           text('notes'),
+  adminNotes:      text('admin_notes'),
+  shippingName:    varchar('shipping_name', { length: 150 }),
+  shippingEmail:   varchar('shipping_email', { length: 255 }),
+  shippingPhone:   varchar('shipping_phone', { length: 30 }),
+  shippingCompany: varchar('shipping_company', { length: 150 }),
+  shippingAddress: text('shipping_address'),
+  createdAt:       timestamp('created_at').defaultNow(),
+  updatedAt:       timestamp('updated_at').defaultNow(),
 });
 
 export const orderItems = pgTable('order_items', {
@@ -105,6 +116,7 @@ export const orderItems = pgTable('order_items', {
 // ─── Contact Messages ─────────────────────────────────────────────────────────
 export const contactMessages = pgTable('contact_messages', {
   id:         serial('id').primaryKey(),
+  userId:     integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   name:       varchar('name', { length: 150 }).notNull(),
   email:      varchar('email', { length: 255 }).notNull(),
   company:    varchar('company', { length: 150 }),
@@ -114,19 +126,47 @@ export const contactMessages = pgTable('contact_messages', {
   productRef: varchar('product_ref', { length: 100 }),
   status:     varchar('status', { length: 30 }).default('nouveau'),
   notes:      text('notes'),
+  readAt:     timestamp('read_at'),
   createdAt:  timestamp('created_at').defaultNow(),
+});
+
+// ─── Testimonials ─────────────────────────────────────────────────────────────
+export const testimonials = pgTable('testimonials', {
+  id:        serial('id').primaryKey(),
+  text:      text('text').notNull(),
+  name:      varchar('name', { length: 100 }).notNull(),
+  company:   varchar('company', { length: 150 }),
+  initials:  varchar('initials', { length: 5 }),
+  rating:    integer('rating').default(5),
+  sortOrder: integer('sort_order').default(0),
+  active:    boolean('active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+export const documents = pgTable('documents', {
+  id:          serial('id').primaryKey(),
+  title:       varchar('title', { length: 255 }).notNull(),
+  filename:    varchar('filename', { length: 255 }),
+  url:         text('url'),
+  description: text('description'),
+  active:      boolean('active').default(true),
+  createdAt:   timestamp('created_at').defaultNow(),
+  updatedAt:   timestamp('updated_at').defaultNow(),
 });
 
 // ─── CMS Pages ────────────────────────────────────────────────────────────────
 export const cmsPages = pgTable('cms_pages', {
-  id:          serial('id').primaryKey(),
-  slug:        varchar('slug', { length: 120 }).notNull().unique(),
-  title:       varchar('title', { length: 255 }).notNull(),
-  content:     text('content'),
-  metaDesc:    varchar('meta_description', { length: 300 }),
-  published:   boolean('published').default(false),
-  createdAt:   timestamp('created_at').defaultNow(),
-  updatedAt:   timestamp('updated_at').defaultNow(),
+  id:        serial('id').primaryKey(),
+  slug:      varchar('slug', { length: 120 }).notNull().unique(),
+  title:     varchar('title', { length: 255 }).notNull(),
+  content:   text('content'),
+  metaDesc:  varchar('meta_description', { length: 300 }),
+  published: boolean('published').default(false),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -138,7 +178,7 @@ export const settings = pgTable('settings', {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Variant = {
-  color:      string;
+  color:       string;
   color_code?: string;
   pms_color?:  string;
   sku?:        string;
@@ -148,8 +188,10 @@ export type Variant = {
   sizes?:      string[];
 };
 
-export type Product          = typeof products.$inferSelect;
-export type User             = typeof users.$inferSelect;
-export type CmsPage          = typeof cmsPages.$inferSelect;
-export type ContactMessage   = typeof contactMessages.$inferSelect;
-export type Order            = typeof orders.$inferSelect;
+export type Product        = typeof products.$inferSelect;
+export type User           = typeof users.$inferSelect;
+export type Order          = typeof orders.$inferSelect;
+export type CmsPage        = typeof cmsPages.$inferSelect;
+export type ContactMessage = typeof contactMessages.$inferSelect;
+export type Testimonial    = typeof testimonials.$inferSelect;
+export type Document       = typeof documents.$inferSelect;

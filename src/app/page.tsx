@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { products } from '@/lib/schema';
-import { eq, desc } from 'drizzle-orm';
+import { products, categories, testimonials } from '@/lib/schema';
+import { eq, asc, and } from 'drizzle-orm';
 import ProductCard from '@/components/ui/ProductCard';
 import type { Product } from '@/lib/schema';
 
@@ -9,14 +9,16 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   let featured: Product[] = [];
+  let cats: (typeof categories.$inferSelect)[] = [];
+  let testi: (typeof testimonials.$inferSelect)[] = [];
+
   try {
-    featured = await db.select().from(products)
-      .where(eq(products.active, true))
-      .orderBy(desc(products.createdAt))
-      .limit(8);
-  } catch {
-    // DB not ready yet — page still renders without products
-  }
+    [featured, cats, testi] = await Promise.all([
+      db.select().from(products).where(eq(products.active, true)).limit(8),
+      db.select().from(categories).where(and(eq(categories.active, true))).orderBy(asc(categories.sortOrder)).limit(8),
+      db.select().from(testimonials).where(eq(testimonials.active, true)).orderBy(asc(testimonials.sortOrder)).limit(6),
+    ]);
+  } catch {}
 
   return (
     <>
@@ -62,7 +64,30 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Featured products */}
+      {/* Catégories */}
+      {cats.length > 0 && (
+        <section className="py-16 px-4 bg-gray-50">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-10">
+              <span className="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Notre catalogue</span>
+              <h2 className="text-2xl font-bold text-gray-900">Explorez nos catégories</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {cats.map(c => (
+                <Link key={c.id} href={`/catalogue?category=${encodeURIComponent(c.name)}`}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-purple-200 transition-all text-center">
+                  <div className="text-3xl mb-2">{c.icon ?? '🗂️'}</div>
+                  <div className="font-semibold text-gray-900 text-sm">{c.name}</div>
+                  {c.description && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{c.description}</div>}
+                  {c.fromPrice && <div className="text-xs text-purple-700 font-medium mt-2">{c.fromPrice}</div>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Produits populaires */}
       {featured.length > 0 && (
         <section className="py-16 px-4">
           <div className="max-w-7xl mx-auto">
@@ -72,6 +97,35 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {featured.map(p => <ProductCard key={p.id} product={p} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Témoignages */}
+      {testi.length > 0 && (
+        <section className="py-16 px-4 bg-gray-50">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-10">
+              <span className="inline-block bg-yellow-100 text-yellow-700 text-xs font-semibold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">Avis clients</span>
+              <h2 className="text-2xl font-bold text-gray-900">Ce que nos clients disent</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {testi.map(t => (
+                <div key={t.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                  <div className="text-yellow-400 text-lg mb-3">{'★'.repeat(t.rating ?? 5)}</div>
+                  <p className="text-gray-700 text-sm leading-relaxed mb-4">&ldquo;{t.text}&rdquo;</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center text-sm font-bold text-purple-700">
+                      {t.initials ?? t.name[0]}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 text-sm">{t.name}</div>
+                      {t.company && <div className="text-xs text-gray-400">{t.company}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

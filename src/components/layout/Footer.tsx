@@ -13,7 +13,11 @@ export default function Footer() {
           <ul className="space-y-2 text-sm">
             <li><Link href="/" className="hover:text-white transition-colors">Accueil</Link></li>
             <li><Link href="/catalogue" className="hover:text-white transition-colors">Catalogue</Link></li>
+            <li><Link href="/documents" className="hover:text-white transition-colors">Documents</Link></li>
             <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+            <li className="pt-2 border-t border-gray-800"><Link href="/cgv" className="hover:text-white transition-colors">CGV</Link></li>
+            <li><Link href="/mentions-legales" className="hover:text-white transition-colors">Mentions légales</Link></li>
+            <li><Link href="/confidentialite" className="hover:text-white transition-colors">Confidentialité</Link></li>
           </ul>
         </div>
         <div>
