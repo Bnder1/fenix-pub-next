@@ -8,7 +8,7 @@ import Footer from '@/components/layout/Footer';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: { default: 'FÉNIX PUB — Objets publicitaires personnalisés', template: '%s | FÉNIX PUB' },
+  title: { default: 'FENIX PUB — Objets publicitaires personnalisés', template: '%s | FÉNIX PUB' },
   description: "Votre partenaire en objets publicitaires et cadeaux d'entreprise personnalisés.",
 };
 
