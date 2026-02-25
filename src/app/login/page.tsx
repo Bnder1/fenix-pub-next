@@ -9,10 +9,18 @@ function LoginForm() {
   const params      = useSearchParams();
   const redirect    = params.get('redirect') ?? '/';
   const registered  = params.get('registered') === '1';
+  // NextAuth redirige vers /login?error=... quand il y a une erreur serveur
+  const urlError    = params.get('error');
+
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(() => {
+    if (!urlError) return '';
+    if (urlError === 'CredentialsSignin') return 'Email ou mot de passe incorrect.';
+    if (urlError === 'Configuration')     return 'Erreur de configuration serveur — vérifiez les variables d\'environnement (AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD).';
+    return `Erreur d'authentification (${urlError}).`;
+  });
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,15 +30,15 @@ function LoginForm() {
       const res = await signIn('credentials', { email, password, redirect: false });
       setLoading(false);
       if (res?.ok) {
-        window.location.href = redirect; // hard reload — session cookie must be re-read
+        window.location.href = redirect; // hard reload — session cookie doit être relu
       } else {
         const code = res?.error ?? '';
         if (code === 'CredentialsSignin' || code === '') {
           setError('Email ou mot de passe incorrect.');
         } else if (code === 'Configuration') {
-          setError('Erreur de configuration serveur. Contactez l\'administrateur.');
+          setError('Erreur de configuration serveur — vérifiez les variables d\'environnement.');
         } else {
-          setError('Erreur de connexion — réessayez dans un instant.');
+          setError(`Erreur de connexion (${code || 'inconnue'}).`);
         }
       }
     } catch {
