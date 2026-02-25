@@ -20,6 +20,7 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
           <Link href="/" className="text-gray-600 hover:text-purple-700 transition-colors">Accueil</Link>
           <Link href="/catalogue" className="text-gray-600 hover:text-purple-700 transition-colors">Catalogue</Link>
+          <Link href="/actu" className="text-gray-600 hover:text-purple-700 transition-colors">Actu</Link>
           <Link href="/contact" className="text-gray-600 hover:text-purple-700 transition-colors">Contact</Link>
           {isAdmin && (
             <Link href="/admin" className="text-orange-600 hover:text-orange-700 font-semibold">Admin</Link>
@@ -77,6 +78,7 @@ export default function Header() {
         <nav className="md:hidden bg-white border-t border-gray-100 px-4 py-3 flex flex-col gap-3 text-sm font-medium">
           <Link href="/" onClick={() => setMenuOpen(false)} className="text-gray-700">Accueil</Link>
           <Link href="/catalogue" onClick={() => setMenuOpen(false)} className="text-gray-700">Catalogue</Link>
+          <Link href="/actu" onClick={() => setMenuOpen(false)} className="text-gray-700">Actu</Link>
           <Link href="/contact" onClick={() => setMenuOpen(false)} className="text-gray-700">Contact</Link>
           {isAdmin && (
             <Link href="/admin" onClick={() => setMenuOpen(false)} className="text-orange-600 font-semibold">Admin</Link>

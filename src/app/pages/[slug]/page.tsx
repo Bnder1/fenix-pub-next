@@ -33,6 +33,8 @@ export default async function CmsPageRoute({ params }: { params: Promise<{ slug:
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/" className="hover:text-purple-700">Accueil</Link>
         <span>/</span>
+        <Link href="/actu" className="hover:text-purple-700">Actu</Link>
+        <span>/</span>
         <span className="text-gray-900">{page!.title}</span>
       </nav>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">{page!.title}</h1>

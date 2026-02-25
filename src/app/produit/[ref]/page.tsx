@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { products, markingTechniques } from '@/lib/schema';
 import type { Variant, MarkingTechnique } from '@/lib/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { imagesArray, priceWithMargin } from '@/lib/utils';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
@@ -29,18 +29,18 @@ export default async function ProductPage({ params }: { params: Promise<{ ref: s
   const meta     = (product.meta     ?? {}) as Record<string, string | number | null>;
   const pkg      = (product.packaging ?? {}) as Record<string, string | number | null>;
 
-  // Load marking techniques linked to this product
-  const markingTechniqueIds = (product.markingTechniqueIds ?? []) as number[];
+  // Load all active marking techniques (always available for any product)
   let productMarkingTechniques: Pick<MarkingTechnique, 'id' | 'name' | 'unitPrice' | 'setupFee'>[] = [];
-  if (markingTechniqueIds.length > 0) {
+  try {
     productMarkingTechniques = await db.select({
       id:        markingTechniques.id,
       name:      markingTechniques.name,
       unitPrice: markingTechniques.unitPrice,
       setupFee:  markingTechniques.setupFee,
     }).from(markingTechniques)
-      .where(and(inArray(markingTechniques.id, markingTechniqueIds), eq(markingTechniques.active, true)));
-  }
+      .where(eq(markingTechniques.active, true))
+      .orderBy(asc(markingTechniques.sortOrder), asc(markingTechniques.name));
+  } catch { /* marking_techniques table may not exist yet */ }
   const productMarkingPositions = (product.markingPositions ?? []) as string[];
 
   return (
