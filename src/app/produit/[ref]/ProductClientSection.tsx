@@ -88,23 +88,29 @@ export default function ProductClientSection({
               Couleur{selectedColor ? ` : ${selectedColor}` : ''}
             </div>
             <div className="flex flex-wrap gap-2">
-              {variants.map(v => (
-                <button
-                  key={v.color}
-                  title={v.color}
-                  onClick={() => setSelectedColor(v.color)}
-                  className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 transition-all ${
-                    selectedColor === v.color
-                      ? 'border-2 border-purple-600 scale-110 shadow-md'
-                      : 'border border-gray-200 hover:border-purple-400'
-                  }`}
-                  style={{ backgroundColor: v.color_code ?? '#ccc' }}
-                >
-                  {!v.color_code && v.image && (
-                    <Image src={v.image} alt={v.color} width={28} height={28} className="object-cover w-full h-full" />
-                  )}
-                </button>
-              ))}
+              {variants.map(v => {
+                const isSelected = selectedColor === v.color;
+                const borderClass = isSelected
+                  ? 'border-2 border-purple-600 scale-110 shadow-md'
+                  : 'border border-gray-200 hover:border-purple-400';
+                return (
+                  <button
+                    key={v.color}
+                    title={v.color}
+                    onClick={() => setSelectedColor(v.color)}
+                    className={`w-8 h-8 rounded-full overflow-hidden flex-shrink-0 transition-all flex items-center justify-center ${borderClass}`}
+                    style={v.color_code ? { backgroundColor: v.color_code } : undefined}
+                  >
+                    {v.color_code ? null : v.image ? (
+                      <Image src={v.image} alt={v.color} width={32} height={32} className="object-cover w-full h-full" />
+                    ) : (
+                      <span className="text-[9px] font-bold text-gray-500 leading-none select-none">
+                        {v.color.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
             {!selectedColor && <p className="text-xs text-amber-600 mt-1">Sélectionnez une couleur pour voir les tailles</p>}
           </div>

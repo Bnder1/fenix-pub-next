@@ -378,12 +378,20 @@ export async function syncMidoceanPrices(): Promise<{ updated: number; errors: n
   }
 
   let updated = 0, errors = 0;
-  for (const [ref, price] of priceMap) {
-    try {
-      await db.update(products).set({ price, updatedAt: new Date() }).where(eq(products.ref, ref));
-      updated++;
-    } catch {
-      errors++;
+
+  // Run 30 concurrent updates per round (much faster than sequential)
+  const entries = Array.from(priceMap.entries());
+  const CONCURRENT_UPDATES = 30;
+  for (let i = 0; i < entries.length; i += CONCURRENT_UPDATES) {
+    const batch = entries.slice(i, i + CONCURRENT_UPDATES);
+    const results = await Promise.allSettled(
+      batch.map(([ref, price]) =>
+        db.update(products).set({ price, updatedAt: new Date() }).where(eq(products.ref, ref))
+      )
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled') updated++;
+      else errors++;
     }
   }
   return { updated, errors };

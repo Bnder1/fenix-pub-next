@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { imagesArray, priceWithMargin, formatPrice } from '@/lib/utils';
-import type { Product } from '@/lib/schema';
+import type { Product, Variant } from '@/lib/schema';
 
 export default function ProductCard({ product }: { product: Product }) {
-  const images = imagesArray(product);
-  const price  = priceWithMargin(product.price);
+  const images   = imagesArray(product);
+  const price    = priceWithMargin(product.price);
+  const variants = (product.variants ?? []) as Variant[];
+  const colorVariants = variants.slice(0, 8);
 
   return (
     <Link href={`/produit/${product.ref}`} className="group block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
@@ -30,6 +32,28 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-2">{product.name}</h3>
+
+        {/* Color swatches */}
+        {colorVariants.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {colorVariants.map(v => (
+              <span
+                key={v.color}
+                title={v.color}
+                className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0 overflow-hidden inline-flex items-center justify-center"
+                style={v.color_code ? { backgroundColor: v.color_code } : undefined}
+              >
+                {!v.color_code && v.image ? (
+                  <Image src={v.image} alt={v.color} width={16} height={16} className="object-cover w-full h-full" />
+                ) : !v.color_code ? (
+                  <span className="text-[6px] font-bold text-gray-400 leading-none">{v.color.slice(0,1)}</span>
+                ) : null}
+              </span>
+            ))}
+            {variants.length > 8 && <span className="text-[10px] text-gray-400 self-center">+{variants.length - 8}</span>}
+          </div>
+        )}
+
         {price > 0 ? (
           <div className="text-purple-700 font-bold text-sm">
             À partir de {formatPrice(price)} €
