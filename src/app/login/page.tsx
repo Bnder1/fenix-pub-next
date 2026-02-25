@@ -29,17 +29,19 @@ function LoginForm() {
     try {
       const res = await signIn('credentials', { email, password, redirect: false });
       setLoading(false);
-      if (res?.ok) {
-        window.location.href = redirect; // hard reload — session cookie doit être relu
+      // res peut être undefined dans certaines versions de NextAuth v5 beta
+      // (redirect interne avant résolution de la promesse) — traiter comme succès
+      if (!res || res.ok) {
+        window.location.href = redirect; // hard reload — relit le cookie de session
+        return;
+      }
+      const code = res.error ?? '';
+      if (code === 'CredentialsSignin' || code === '') {
+        setError('Email ou mot de passe incorrect.');
+      } else if (code === 'Configuration') {
+        setError('Erreur de configuration serveur — vérifiez les variables d\'environnement.');
       } else {
-        const code = res?.error ?? '';
-        if (code === 'CredentialsSignin' || code === '') {
-          setError('Email ou mot de passe incorrect.');
-        } else if (code === 'Configuration') {
-          setError('Erreur de configuration serveur — vérifiez les variables d\'environnement.');
-        } else {
-          setError(`Erreur de connexion (${code || 'inconnue'}).`);
-        }
+        setError(`Erreur de connexion (${code || 'inconnue'}).`);
       }
     } catch {
       setLoading(false);

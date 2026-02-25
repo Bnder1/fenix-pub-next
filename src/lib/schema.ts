@@ -184,8 +184,9 @@ export type Variant = {
   sku?:        string;
   gtin?:       string;
   status?:     string;
-  image?:      string;
-  sizes?:      string[];
+  image?:      string;   // image principale (front) de la couleur
+  images?:     string[]; // toutes les images de cette couleur
+  sizes?:      string[]; // tailles disponibles pour cette couleur (S, M, L, XL…)
 };
 
 export type Product        = typeof products.$inferSelect;

@@ -73,13 +73,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     jwt({ token, user }) {
-      if (user) token.role = (user as { role?: string }).role;
+      if (user) {
+        token.role = (user as { role?: string }).role;
+        // Explicitly store id so it survives across all sessions
+        token.uid  = (user as { id?: string }).id ?? token.sub;
+      }
       return token;
     },
     session({ session, token }) {
       if (session.user) {
         (session.user as { role?: string; id?: string }).role = token.role as string;
-        (session.user as { role?: string; id?: string }).id   = token.sub;
+        (session.user as { role?: string; id?: string }).id   = (token.uid ?? token.sub) as string;
       }
       return session;
     },

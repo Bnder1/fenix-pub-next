@@ -1,8 +1,9 @@
 /**
  * Midocean API client — ported from fenix-pub-laravel MidoceanController.php
+ * Extended to handle clothing variants (color + size per SKU)
  *
  * Endpoints:
- *   Import : GET /gateway/products/2.0?language={lang}  (303 redirect → S3 ~25MB)
+ *   Import : GET /gateway/products/2.0?language={lang}  (303 redirect → S3 ~25 MB)
  *   Test   : GET /gateway/stock/2.0?language={lang}
  */
 import { db } from '@/lib/db';
@@ -32,7 +33,7 @@ export async function getMidoceanSettings(): Promise<MidoceanConfig | null> {
   }
 }
 
-// ─── Helpers (mirrors PHP helpers) ───────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isImageUrl(url: string): boolean {
   const path = url.split('?')[0] ?? '';
@@ -51,37 +52,70 @@ function parseDimensions(item: any): string | null {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractImage(item: any): string | null {
-  // 1. Front image from first variant's digital_assets
-  for (const variant of (item.variants ?? [])) {
-    for (const asset of (variant.digital_assets ?? [])) {
-      const url     = asset.url ?? null;
-      const subtype = String(asset.subtype ?? '').toLowerCase();
-      if (url && isImageUrl(url) && subtype.includes('front')) return url;
-    }
-    // 2. First image of any type from variant
-    for (const asset of (variant.digital_assets ?? [])) {
-      const url  = asset.url ?? null;
-      const type = String(asset.type ?? '').toLowerCase();
-      if (url && isImageUrl(url) && type === 'image') return url;
-    }
+function parsePrice(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'number') return raw.toFixed(2);
+  if (typeof raw === 'string' && raw.trim() !== '') return raw;
+  // Nested object: { amount: 12.50 } or { value: 12.50 } or { net: 12.50 }
+  if (typeof raw === 'object' && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    const val = obj.amount ?? obj.value ?? obj.net ?? obj.price ?? obj.net_price;
+    if (val != null) return parsePrice(val);
   }
-  // 3. Root digital_assets
+  return null;
+}
+
+/**
+ * Collect all image URLs from a variant's digital_assets.
+ * Returns { frontImage, allImages }.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function collectVariantImages(v: any): { front: string | null; all: string[] } {
+  const all: string[] = [];
+  let front: string | null = null;
+
+  for (const asset of (v.digital_assets ?? [])) {
+    const url     = asset.url ?? null;
+    const type    = String(asset.type    ?? '').toLowerCase();
+    const subtype = String(asset.subtype ?? '').toLowerCase();
+    if (!url || !isImageUrl(url)) continue;
+    if (type !== 'image') continue;
+    if (!all.includes(url)) all.push(url);
+    if (!front && subtype.includes('front')) front = url;
+  }
+
+  if (!front && all.length > 0) front = all[0];
+  return { front, all };
+}
+
+/**
+ * Extract the primary product image.
+ * Priority: front of first variant → any image of any variant → root digital_assets.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractImage(item: any): string | null {
+  for (const v of (item.variants ?? [])) {
+    const { front } = collectVariantImages(v);
+    if (front) return front;
+  }
+  // Root digital_assets fallback
   for (const asset of (item.digital_assets ?? [])) {
     const url  = asset.url ?? null;
     const type = String(asset.type ?? '').toLowerCase();
     if (url && isImageUrl(url) && type === 'image') return url;
   }
-  // 4. Fallback to plain fields
   const fallback = item.image ?? item.imageUrl ?? item.image_url ?? null;
-  return (fallback && isImageUrl(fallback)) ? fallback : null;
+  return (fallback && isImageUrl(String(fallback))) ? String(fallback) : null;
 }
 
+/**
+ * Collect ALL images across all variants + root digital_assets (deduped).
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractAllImages(item: any): string[] {
   const urls: string[] = [];
-  for (const variant of (item.variants ?? [])) {
-    for (const asset of (variant.digital_assets ?? [])) {
+  for (const v of (item.variants ?? [])) {
+    for (const asset of (v.digital_assets ?? [])) {
       const url  = asset.url ?? null;
       const type = String(asset.type ?? '').toLowerCase();
       if (url && isImageUrl(url) && type === 'image' && !urls.includes(url)) urls.push(url);
@@ -95,51 +129,77 @@ function extractAllImages(item: any): string[] {
   return urls;
 }
 
+/**
+ * Extract variants grouped by color.
+ * For clothing, each SKU is color+size → we accumulate sizes per color.
+ * Each color variant also gets all its images.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractVariants(item: any): Variant[] {
-  const variants: Variant[]  = [];
-  const seenColors: string[] = [];
+  // Use a Map keyed by color to accumulate sizes & images
+  const byColor = new Map<string, Variant & { images: string[] }>();
 
   for (const v of (item.variants ?? item.variations ?? [])) {
     const color = v.color_group ?? v.colorGroup ?? v.color_description ?? v.color ?? null;
-    if (!color || seenColors.includes(color)) continue;
+    if (!color) continue;
 
-    // Front image, then any image
-    let image: string | null = null;
-    for (const asset of (v.digital_assets ?? [])) {
-      const url     = asset.url ?? null;
-      const subtype = String(asset.subtype ?? '').toLowerCase();
-      if (url && isImageUrl(url) && subtype.includes('front')) { image = url; break; }
-    }
-    if (!image) {
-      for (const asset of (v.digital_assets ?? [])) {
-        const url  = asset.url ?? null;
-        const type = String(asset.type ?? '').toLowerCase();
-        if (url && isImageUrl(url) && type === 'image') { image = url; break; }
+    const size = v.size ?? v.size_label ?? v.size_description ?? v.sizeName ?? null;
+
+    if (!byColor.has(color)) {
+      const { front, all } = collectVariantImages(v);
+      byColor.set(color, {
+        color,
+        color_code: v.color_code  ?? v.colorCode  ?? undefined,
+        pms_color:  v.pms_color   ?? v.pmsColor   ?? undefined,
+        sku:        v.sku         ?? undefined,
+        gtin:       v.gtin        ?? undefined,
+        status:     v.plc_status_description ?? v.status ?? undefined,
+        image:      front ?? undefined,
+        images:     all,
+        sizes:      size ? [String(size)] : [],
+      });
+    } else {
+      // Same color — accumulate size and images
+      const entry = byColor.get(color)!;
+
+      if (size) {
+        const s = String(size);
+        if (!entry.sizes?.includes(s)) entry.sizes = [...(entry.sizes ?? []), s];
       }
-    }
 
-    seenColors.push(color);
-    variants.push({
-      color,
-      color_code: v.color_code  ?? undefined,
-      pms_color:  v.pms_color   ?? undefined,
-      sku:        v.sku         ?? undefined,
-      gtin:       v.gtin        ?? undefined,
-      status:     v.plc_status_description ?? undefined,
-      image:      image ?? undefined,
-    });
+      const { all } = collectVariantImages(v);
+      for (const url of all) {
+        if (!entry.images.includes(url)) entry.images.push(url);
+      }
+      // Update front image if we have a better one
+      if (!entry.image && entry.images.length > 0) entry.image = entry.images[0];
+    }
   }
-  return variants;
+
+  return Array.from(byColor.values());
+}
+
+/**
+ * Extract all sizes at the product level (aggregated across all color variants).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractSizes(item: any): string[] {
+  const seen = new Set<string>();
+  for (const v of (item.variants ?? [])) {
+    const s = v.size ?? v.size_label ?? v.size_description ?? v.sizeName ?? null;
+    if (s) seen.add(String(s));
+  }
+  return Array.from(seen);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractColors(item: any): string | null {
   if (Array.isArray(item.variants) && item.variants.length > 0) {
     const colors = [...new Set(
-      item.variants
-        .map((v: any) => v.color_group ?? v.colorGroup ?? v.color_description ?? v.color ?? null)
-        .filter(Boolean)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      item.variants.map((v: any) =>
+        v.color_group ?? v.colorGroup ?? v.color_description ?? v.color ?? null
+      ).filter(Boolean)
     )] as string[];
     return colors.length ? colors.join(', ') : null;
   }
@@ -150,9 +210,8 @@ function extractColors(item: any): string | null {
 function extractPrintTechniques(item: any): string | null {
   const field = item.printing_techniques ?? item.printingTechniques ?? null;
   if (Array.isArray(field) && field.length > 0) {
-    const names = field
-      .map((t: any) => t.print_type_name ?? t.techniqueName ?? t.name ?? null)
-      .filter(Boolean);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const names = field.map((t: any) => t.print_type_name ?? t.techniqueName ?? t.name ?? null).filter(Boolean);
     return names.length ? names.join(', ') : null;
   }
   return item.print_techniques ?? null;
@@ -161,13 +220,12 @@ function extractPrintTechniques(item: any): string | null {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractPackaging(item: any): Record<string, unknown> | null {
   const data: Record<string, unknown> = {};
-  const fields = [
+  for (const f of [
     'inner_carton_quantity', 'outer_carton_quantity',
     'carton_gross_weight',   'carton_gross_weight_unit',
     'carton_length',         'carton_width',          'carton_height',
     'packaging_after_printing',
-  ];
-  for (const f of fields) {
+  ]) {
     if (item[f] != null) data[f] = item[f];
   }
   return Object.keys(data).length ? data : null;
@@ -175,19 +233,18 @@ function extractPackaging(item: any): Record<string, unknown> | null {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractMeta(item: any): Record<string, unknown> {
-  const fields = [
+  const data: Record<string, unknown> = {};
+  for (const f of [
     'type_of_products', 'brand', 'number_of_print_positions',
     'net_weight', 'net_weight_unit', 'gross_weight_unit',
     'volume', 'volume_unit', 'commodity_code', 'master_id', 'timestamp',
-  ];
-  const data: Record<string, unknown> = {};
-  for (const f of fields) {
+  ]) {
     if (item[f] != null) data[f] = item[f];
   }
   return data;
 }
 
-// ─── Map one product ──────────────────────────────────────────────────────────
+// ─── Map product ──────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapProduct(item: any) {
@@ -200,7 +257,7 @@ function mapProduct(item: any) {
     description:     item.short_description  ?? item.shortDescription ?? null,
     longDescription: item.long_description   ?? item.longDescription  ?? item.full_description ?? null,
     category:        item.product_class       ?? item.category_code    ?? item.categoryPath     ?? null,
-    price:           item.net_price           ?? item.netPrice         ?? item.price            ?? null,
+    price:           parsePrice(item.net_price ?? item.netPrice ?? item.price),
     moq:             parseInt(String(item.moq ?? 50), 10) || 50,
     material:        item.material            ?? null,
     dimensions:      parseDimensions(item),
@@ -210,6 +267,7 @@ function mapProduct(item: any) {
     image:           extractImage(item),
     images:          extractAllImages(item),
     variants:        extractVariants(item),
+    sizes:           extractSizes(item),        // product-level size list
     colors:          extractColors(item),
     printTechniques: extractPrintTechniques(item),
     printable:       !!(
@@ -220,7 +278,7 @@ function mapProduct(item: any) {
     packaging:       extractPackaging(item),
     meta:            extractMeta(item),
     source:          'midocean' as const,
-    active:          false,           // newly imported products are inactive — admin activates manually
+    active:          false,   // admin activates products manually
     updatedAt:       new Date(),
   };
 }
@@ -231,8 +289,8 @@ function mapProduct(item: any) {
 async function fetchCatalogue(cfg: MidoceanConfig): Promise<any[]> {
   const url = `${cfg.baseUrl}/gateway/products/2.0?language=${cfg.lang}`;
   const res = await fetch(url, {
-    headers: { 'x-Gateway-APIKey': cfg.apiKey },
-    redirect: 'follow',              // follows 303 redirect to S3
+    headers:  { 'x-Gateway-APIKey': cfg.apiKey },
+    redirect: 'follow',   // API returns 303 → S3 ~25 MB
     signal:   AbortSignal.timeout(120_000),
   });
   if (!res.ok) throw new Error(`Midocean API HTTP ${res.status}: ${res.statusText}`);
@@ -255,8 +313,7 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
 
   const catalogue = await fetchCatalogue(cfg);
   const total   = catalogue.length;
-  let created   = 0;
-  let updated   = 0;
+  let synced    = 0;
   let errors    = 0;
   let skipped   = 0;
 
@@ -284,6 +341,7 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
             image:           mapped.image,
             images:          mapped.images,
             variants:        mapped.variants,
+            sizes:           mapped.sizes,
             colors:          mapped.colors,
             printTechniques: mapped.printTechniques,
             printable:       mapped.printable,
@@ -291,24 +349,18 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
             meta:            mapped.meta,
             source:          'midocean',
             updatedAt:       new Date(),
-            // NOTE: active is NOT updated on re-sync to preserve manual activations
+            // active intentionally NOT updated on re-sync
           },
         });
 
-      // Detect create vs update (simple heuristic: check if was already in DB)
-      // onConflictDoUpdate doesn't tell us which path was taken, so count as updated
-      updated++;
+      synced++;
     } catch (err) {
-      console.error('[midocean] sync item error:', item?.master_code ?? item?.masterCode, err);
+      console.error('[midocean] sync error:', item?.master_code ?? item?.masterCode, err);
       errors++;
     }
   }
 
-  // Adjust: first-time items go into created bucket (not critical for UX)
-  created = updated; // simplification — admin sees total synced
-  updated = 0;
-
-  return { total, created, updated, errors, skipped };
+  return { total, created: synced, updated: 0, errors, skipped };
 }
 
 // ─── Test connection ──────────────────────────────────────────────────────────
