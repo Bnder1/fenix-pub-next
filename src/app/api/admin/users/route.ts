@@ -12,16 +12,21 @@ async function requireAdmin() {
 
 export async function GET() {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  // Ne jamais retourner le hash du mot de passe
-  const list = await db.select({
-    id:        users.id,
-    name:      users.name,
-    email:     users.email,
-    company:   users.company,
-    phone:     users.phone,
-    role:      users.role,
-    active:    users.active,
-    createdAt: users.createdAt,
-  }).from(users).orderBy(desc(users.createdAt));
-  return NextResponse.json(list);
+  try {
+    // Ne jamais retourner le hash du mot de passe
+    const list = await db.select({
+      id:        users.id,
+      name:      users.name,
+      email:     users.email,
+      company:   users.company,
+      phone:     users.phone,
+      role:      users.role,
+      active:    users.active,
+      createdAt: users.createdAt,
+    }).from(users).orderBy(desc(users.createdAt));
+    return NextResponse.json(list);
+  } catch (err) {
+    console.error('[users] GET error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
 }

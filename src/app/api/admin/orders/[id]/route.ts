@@ -14,17 +14,22 @@ const ALLOWED_STATUSES = ['pending','confirmed','processing','shipped','delivere
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { id } = await params;
-  const body = await req.json();
+  try {
+    const { id } = await params;
+    const body = await req.json();
 
-  if (body.status && !ALLOWED_STATUSES.includes(body.status)) {
-    return NextResponse.json({ error: 'Statut invalide' }, { status: 422 });
+    if (body.status && !ALLOWED_STATUSES.includes(body.status)) {
+      return NextResponse.json({ error: 'Statut invalide' }, { status: 422 });
+    }
+
+    const [updated] = await db.update(orders).set({
+      status:     body.status     || undefined,
+      adminNotes: body.adminNotes ?? undefined,
+      updatedAt:  new Date(),
+    }).where(eq(orders.id, parseInt(id))).returning();
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error('[orders/id] PUT error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
-
-  const [updated] = await db.update(orders).set({
-    status:     body.status     || undefined,
-    adminNotes: body.adminNotes ?? undefined,
-    updatedAt:  new Date(),
-  }).where(eq(orders.id, parseInt(id))).returning();
-  return NextResponse.json(updated);
 }

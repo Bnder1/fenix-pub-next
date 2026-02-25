@@ -12,22 +12,27 @@ async function requireAdmin() {
 
 export async function POST(req: NextRequest) {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const body = await req.json();
-  const [p] = await db.insert(products).values({
-    ref:             body.ref,
-    name:            body.name,
-    category:        body.category     || null,
-    price:           body.price        || null,
-    moq:             body.moq          || null,
-    description:     body.description  || null,
-    material:        body.material     || null,
-    dimensions:      body.dimensions   || null,
-    weight:          body.weight       || null,
-    image:           body.image        || null,
-    colors:          body.colors       || null,
-    printTechniques: body.printTechniques || null,
-    source:          body.source       ?? 'manual',
-    active:          body.active       ?? true,
-  }).returning();
-  return NextResponse.json(p, { status: 201 });
+  try {
+    const body = await req.json();
+    const [p] = await db.insert(products).values({
+      ref:             body.ref,
+      name:            body.name,
+      category:        body.category        || null,
+      price:           body.price           || null,
+      moq:             body.moq             || null,
+      description:     body.description     || null,
+      material:        body.material        || null,
+      dimensions:      body.dimensions      || null,
+      weight:          body.weight          || null,
+      image:           body.image           || null,
+      colors:          body.colors          || null,
+      printTechniques: body.printTechniques || null,
+      source:          body.source          ?? 'manual',
+      active:          body.active          ?? true,
+    }).returning();
+    return NextResponse.json(p, { status: 201 });
+  } catch (err) {
+    console.error('[products] POST error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
 }

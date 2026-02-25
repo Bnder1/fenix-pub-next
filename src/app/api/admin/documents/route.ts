@@ -12,17 +12,27 @@ async function requireAdmin() {
 
 export async function GET() {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const list = await db.select().from(documents).orderBy(desc(documents.createdAt));
-  return NextResponse.json(list);
+  try {
+    const list = await db.select().from(documents).orderBy(desc(documents.createdAt));
+    return NextResponse.json(list);
+  } catch (err) {
+    console.error('[documents] GET error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { title, url, filename, description, active } = await req.json();
-  if (!title?.trim()) return NextResponse.json({ error: 'title requis' }, { status: 422 });
-  const [doc] = await db.insert(documents).values({
-    title: title.trim(), url: url || null, filename: filename || null,
-    description: description || null, active: active ?? true,
-  }).returning();
-  return NextResponse.json(doc, { status: 201 });
+  try {
+    const { title, url, filename, description, active } = await req.json();
+    if (!title?.trim()) return NextResponse.json({ error: 'title requis' }, { status: 422 });
+    const [doc] = await db.insert(documents).values({
+      title: title.trim(), url: url || null, filename: filename || null,
+      description: description || null, active: active ?? true,
+    }).returning();
+    return NextResponse.json(doc, { status: 201 });
+  } catch (err) {
+    console.error('[documents] POST error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
 }

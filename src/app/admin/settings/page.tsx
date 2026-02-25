@@ -5,7 +5,12 @@ import SettingsForm from './SettingsForm';
 export const metadata = { title: 'Paramètres — Admin' };
 
 export default async function SettingsPage() {
-  const rows = await db.select().from(settings);
+  let rows: { id: number; key: string; value: string | null }[] = [];
+  try {
+    rows = await db.select().from(settings);
+  } catch (err) {
+    console.error('[settings page] DB error:', err);
+  }
   const s = Object.fromEntries(rows.map(r => [r.key, r.value ?? '']));
   return (
     <div>

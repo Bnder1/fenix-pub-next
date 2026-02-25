@@ -12,18 +12,28 @@ async function requireAdmin() {
 
 export async function GET() {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const list = await db.select().from(testimonials).orderBy(asc(testimonials.sortOrder));
-  return NextResponse.json(list);
+  try {
+    const list = await db.select().from(testimonials).orderBy(asc(testimonials.sortOrder));
+    return NextResponse.json(list);
+  } catch (err) {
+    console.error('[testimonials] GET error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { text, name, company, initials, rating, sortOrder, active } = await req.json();
-  if (!text?.trim() || !name?.trim()) return NextResponse.json({ error: 'text et name requis' }, { status: 422 });
-  const [t] = await db.insert(testimonials).values({
-    text: text.trim(), name: name.trim(),
-    company: company || null, initials: initials || null,
-    rating: rating ?? 5, sortOrder: sortOrder ?? 0, active: active ?? true,
-  }).returning();
-  return NextResponse.json(t, { status: 201 });
+  try {
+    const { text, name, company, initials, rating, sortOrder, active } = await req.json();
+    if (!text?.trim() || !name?.trim()) return NextResponse.json({ error: 'text et name requis' }, { status: 422 });
+    const [t] = await db.insert(testimonials).values({
+      text: text.trim(), name: name.trim(),
+      company: company || null, initials: initials || null,
+      rating: rating ?? 5, sortOrder: sortOrder ?? 0, active: active ?? true,
+    }).returning();
+    return NextResponse.json(t, { status: 201 });
+  } catch (err) {
+    console.error('[testimonials] POST error:', err);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
 }

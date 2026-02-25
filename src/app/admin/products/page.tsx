@@ -1,9 +1,10 @@
 import { db } from '@/lib/db';
-import { products } from '@/lib/schema';
+import { products, settings } from '@/lib/schema';
 import { eq, like, and, SQL } from 'drizzle-orm';
 import Link from 'next/link';
 import Image from 'next/image';
 import { imagesArray } from '@/lib/utils';
+import MidoceanSync from './MidoceanSync';
 
 export const metadata = { title: 'Produits — Admin' };
 
@@ -19,8 +20,23 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
     items = await db.select().from(products).where(where).orderBy(products.id).limit(200);
   } catch {}
 
+  let lastSync  = '';
+  let lastCount = '';
+  try {
+    const rows = await db.select().from(settings).where(
+      eq(settings.key, 'midocean_last_sync')
+    );
+    if (rows.length) lastSync = rows[0].value ?? '';
+    const countRows = await db.select().from(settings).where(
+      eq(settings.key, 'midocean_last_count')
+    );
+    if (countRows.length) lastCount = countRows[0].value ?? '';
+  } catch {}
+
   return (
     <div>
+      <MidoceanSync lastSync={lastSync} lastCount={lastCount} />
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-900">Produits ({items.length})</h1>
         <Link href="/admin/products/new" className="px-4 py-2 bg-purple-700 text-white rounded-lg text-sm font-medium hover:bg-purple-800 transition-colors">
