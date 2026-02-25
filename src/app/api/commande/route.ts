@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { cartItems, orders, orderItems, products, settings, markingTechniques } from '@/lib/schema';
+import { cartItems, orders, orderItems, products, settings, markingTechniques, users } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
 function generateOrderNumber(): string {
@@ -16,10 +16,11 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
   const userId = parseInt((session.user as { id?: string }).id ?? '0');
 
-  const { shippingName, shippingEmail, shippingPhone, shippingCompany, shippingAddress, notes } = await req.json();
-  if (!shippingName?.trim() || !shippingEmail?.trim()) {
-    return NextResponse.json({ error: 'Nom et email de livraison requis' }, { status: 422 });
-  }
+  const { notes } = await req.json().catch(() => ({}));
+
+  // Load user info from DB (name, email, phone, company)
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 401 });
 
   // Récupérer les articles du panier avec les infos produit
   const cart = await db.select({
@@ -41,15 +42,9 @@ export async function POST(req: NextRequest) {
   // Fetch marking techniques for cart items that have one
   const techniqueIds = [...new Set(cart.map(c => c.item.markingTechniqueId).filter(Boolean))] as number[];
   const techniqueMap = new Map<number, typeof markingTechniques.$inferSelect>();
-  if (techniqueIds.length > 0) {
-    const techs = await db.select().from(markingTechniques).where(
-      eq(markingTechniques.id, techniqueIds[0]) // handled below with loop
-    );
-    // Fetch all needed techniques
-    for (const tid of techniqueIds) {
-      const [t] = await db.select().from(markingTechniques).where(eq(markingTechniques.id, tid)).limit(1);
-      if (t) techniqueMap.set(tid, t);
-    }
+  for (const tid of techniqueIds) {
+    const [t] = await db.select().from(markingTechniques).where(eq(markingTechniques.id, tid)).limit(1);
+    if (t) techniqueMap.set(tid, t);
   }
 
   const total = cart.reduce((sum, { item, product }) => {
@@ -66,18 +61,18 @@ export async function POST(req: NextRequest) {
     return sum + lineTotal;
   }, 0);
 
-  // Créer la commande
+  // Créer la commande (shipping info depuis le compte utilisateur)
   const [order] = await db.insert(orders).values({
     orderNumber:     generateOrderNumber(),
     userId,
     status:          'pending',
     total:           total.toFixed(2),
     notes:           notes || null,
-    shippingName:    shippingName.trim(),
-    shippingEmail:   shippingEmail.trim(),
-    shippingPhone:   shippingPhone || null,
-    shippingCompany: shippingCompany || null,
-    shippingAddress: shippingAddress || null,
+    shippingName:    user.name,
+    shippingEmail:   user.email,
+    shippingPhone:   user.phone   || null,
+    shippingCompany: user.company || null,
+    shippingAddress: null,
   }).returning();
 
   // Créer les lignes de commande

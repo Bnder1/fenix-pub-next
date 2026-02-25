@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Variant, MarkingTechnique } from '@/lib/schema';
 
@@ -10,20 +10,20 @@ interface Props {
   price:             number;
   variants:          Variant[];
   sizes:             string[];
+  selectedColor:     string | null;
   markingTechniques: Pick<MarkingTechnique, 'id' | 'name' | 'unitPrice' | 'setupFee'>[];
   markingPositions:  string[];
-  onColorChange?:    (color: string | null) => void;
 }
 
 export default function AddToCartButton({
   productId, moq, price, variants, sizes,
-  markingTechniques, markingPositions, onColorChange,
+  selectedColor,
+  markingTechniques, markingPositions,
 }: Props) {
   const router = useRouter();
 
   const hasVariants = variants.length > 0;
 
-  const [selectedColor,      setSelectedColor]      = useState<string | null>(null);
   const [sizeQtys,           setSizeQtys]           = useState<Record<string, number>>({});
   const [qty,                setQty]                = useState(moq);
   const [selectedTechId,     setSelectedTechId]     = useState<number | null>(null);
@@ -36,11 +36,8 @@ export default function AddToCartButton({
     : sizes;
   const hasSizes = availableSizes.length > 0;
 
-  function handleColorChange(color: string) {
-    setSelectedColor(color);
-    setSizeQtys({});
-    onColorChange?.(color);
-  }
+  // Reset size quantities when color changes
+  useEffect(() => { setSizeQtys({}); }, [selectedColor]);
 
   function setSizeQty(size: string, q: number) {
     setSizeQtys(prev => ({ ...prev, [size]: Math.max(0, q) }));
@@ -99,24 +96,6 @@ export default function AddToCartButton({
 
   return (
     <div className="space-y-4">
-      {/* Color selection */}
-      {hasVariants && (
-        <div>
-          <div className="text-sm font-medium text-gray-700 mb-2">
-            Couleur{selectedColor ? ` : ${selectedColor}` : ''}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {variants.map(v => (
-              <button key={v.color} onClick={() => handleColorChange(v.color)}
-                className={selectedColor === v.color ? btnActive : btnIdle}>
-                {v.color}
-              </button>
-            ))}
-          </div>
-          {!selectedColor && <p className="text-xs text-amber-600 mt-1">Veuillez sélectionner une couleur</p>}
-        </div>
-      )}
-
       {/* Qty per size OR simple qty */}
       {hasSizes ? (
         <div>

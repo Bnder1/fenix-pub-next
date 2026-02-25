@@ -81,22 +81,32 @@ export default function ProductClientSection({
           <p className="text-gray-600 leading-relaxed mb-6">{product.description}</p>
         )}
 
-        {/* Color swatches preview (non-interactive, just to show palette) */}
+        {/* Color swatches — interactive */}
         {variants.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {variants.slice(0, 12).map(v => (
-              <div
-                key={v.color}
-                title={v.color}
-                className="w-5 h-5 rounded-full border border-gray-200 overflow-hidden flex-shrink-0"
-                style={{ backgroundColor: v.color_code ?? '#ccc' }}
-              >
-                {!v.color_code && v.image && (
-                  <Image src={v.image} alt={v.color} width={20} height={20} className="object-cover w-full h-full" />
-                )}
-              </div>
-            ))}
-            {variants.length > 12 && <span className="text-xs text-gray-400 self-center">+{variants.length - 12}</span>}
+          <div className="mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              Couleur{selectedColor ? ` : ${selectedColor}` : ''}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {variants.map(v => (
+                <button
+                  key={v.color}
+                  title={v.color}
+                  onClick={() => setSelectedColor(v.color)}
+                  className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 transition-all ${
+                    selectedColor === v.color
+                      ? 'border-2 border-purple-600 scale-110 shadow-md'
+                      : 'border border-gray-200 hover:border-purple-400'
+                  }`}
+                  style={{ backgroundColor: v.color_code ?? '#ccc' }}
+                >
+                  {!v.color_code && v.image && (
+                    <Image src={v.image} alt={v.color} width={28} height={28} className="object-cover w-full h-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+            {!selectedColor && <p className="text-xs text-amber-600 mt-1">Sélectionnez une couleur pour voir les tailles</p>}
           </div>
         )}
 
@@ -157,9 +167,9 @@ export default function ProductClientSection({
               price={price}
               variants={variants}
               sizes={sizes}
+              selectedColor={selectedColor}
               markingTechniques={markingTechniques}
               markingPositions={markingPositions}
-              onColorChange={setSelectedColor}
             />
             <FavoriteButton productId={product.id} />
           </div>

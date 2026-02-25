@@ -360,30 +360,23 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
 }
 
 // ─── Pricelist sync ──────────────────────────────────────────────────────────
-
-async function fetchPricelist(cfg: MidoceanConfig): Promise<Map<string, string>> {
-  const url = `${cfg.baseUrl}/gateway/price/2.0?language=${cfg.lang}`;
-  const res = await fetch(url, {
-    headers:  { 'x-Gateway-APIKey': cfg.apiKey },
-    redirect: 'follow',
-    signal:   AbortSignal.timeout(120_000),
-  });
-  if (!res.ok) throw new Error(`Pricelist HTTP ${res.status}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await res.json();
-  const map = new Map<string, string>();
-  for (const item of (Array.isArray(data) ? data : [])) {
-    const code  = item.master_code ?? item.masterCode ?? '';
-    const price = parsePrice(item.net_price ?? item.netPrice ?? item.price);
-    if (code && price) map.set(code, price);
-  }
-  return map;
-}
+// Reuses the catalogue endpoint (which includes net_price) rather than a
+// separate /gateway/price endpoint that may not be available.
 
 export async function syncMidoceanPrices(): Promise<{ updated: number; errors: number }> {
   const cfg = await getMidoceanSettings();
   if (!cfg) throw new Error('Clé API non configurée');
-  const priceMap = await fetchPricelist(cfg);
+
+  // Catalogue already contains net_price for each product
+  const catalogue = await fetchCatalogue(cfg);
+
+  const priceMap = new Map<string, string>();
+  for (const item of catalogue) {
+    const code  = (item.master_code ?? item.masterCode ?? '').trim();
+    const price = parsePrice(item.net_price ?? item.netPrice ?? item.price);
+    if (code && price) priceMap.set(code, price);
+  }
+
   let updated = 0, errors = 0;
   for (const [ref, price] of priceMap) {
     try {
