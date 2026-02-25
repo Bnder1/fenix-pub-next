@@ -216,6 +216,12 @@ CREATE TABLE IF NOT EXISTS marking_techniques (
   created_at  TIMESTAMP     DEFAULT NOW()
 );
 
+-- ─── 19. design_notes + design_file ─────────────────────────
+ALTER TABLE cart_items  ADD COLUMN IF NOT EXISTS design_notes TEXT;
+ALTER TABLE cart_items  ADD COLUMN IF NOT EXISTS design_file  TEXT;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS design_notes TEXT;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS design_file  TEXT;
+
 -- ─── 18. order_exchanges ─────────────────────────────────────
 CREATE TABLE IF NOT EXISTS order_exchanges (
   id               SERIAL PRIMARY KEY,

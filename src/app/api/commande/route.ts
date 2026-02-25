@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
         markingPosition:      item.markingPosition ?? null,
         markingUnitPrice:     tech ? String(tech.unitPrice) : null,
         markingSetupFee:      tech ? String(tech.setupFee)  : null,
+        designNotes:          item.designNotes ?? null,
+        designFile:           item.designFile  ?? null,
       };
     })
   );

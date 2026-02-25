@@ -171,6 +171,7 @@ export default function ProductClientSection({
               productId={product.id}
               moq={product.moq ?? 1}
               price={price}
+              printable={!!product.printable}
               variants={variants}
               sizes={sizes}
               selectedColor={selectedColor}

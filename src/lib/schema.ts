@@ -83,6 +83,8 @@ export const cartItems = pgTable('cart_items', {
   color:              varchar('color', { length: 100 }),
   markingTechniqueId: integer('marking_technique_id'),
   markingPosition:    varchar('marking_position', { length: 150 }),
+  designNotes:        text('design_notes'),
+  designFile:         text('design_file'),   // base64 data URL or external URL
   createdAt:          timestamp('created_at').defaultNow(),
   updatedAt:          timestamp('updated_at').defaultNow(),
 });
@@ -121,6 +123,8 @@ export const orderItems = pgTable('order_items', {
   markingPosition:      varchar('marking_position', { length: 150 }),
   markingUnitPrice:     numeric('marking_unit_price', { precision: 10, scale: 2 }),
   markingSetupFee:      numeric('marking_setup_fee',  { precision: 10, scale: 2 }),
+  designNotes:          text('design_notes'),
+  designFile:           text('design_file'),
 });
 
 // ─── Contact Messages ─────────────────────────────────────────────────────────
