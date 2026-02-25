@@ -3,9 +3,8 @@
  * Extended to handle clothing variants (color + size per SKU)
  *
  * Endpoints:
- *   Import   : GET /gateway/products/2.0?language={lang}  (303 redirect → S3 ~25 MB)
- *   Pricelist: GET /gateway/pricelist/2.0?language={lang}
- *   Stock    : GET /gateway/stock/2.0?language={lang}
+ *   Import : GET /gateway/products/2.0?language={lang}  (303 redirect → S3 ~25 MB)
+ *   Test   : GET /gateway/stock/2.0?language={lang}
  */
 import { db } from '@/lib/db';
 import { products, settings } from '@/lib/schema';
@@ -57,7 +56,6 @@ function parsePrice(raw: unknown): string | null {
   if (raw == null) return null;
   if (typeof raw === 'number') return raw.toFixed(2);
   if (typeof raw === 'string' && raw.trim() !== '') return raw;
-  // Nested object: { amount: 12.50 } or { value: 12.50 } or { net: 12.50 }
   if (typeof raw === 'object' && raw !== null) {
     const obj = raw as Record<string, unknown>;
     const val = obj.amount ?? obj.value ?? obj.net ?? obj.price ?? obj.net_price;
@@ -66,10 +64,6 @@ function parsePrice(raw: unknown): string | null {
   return null;
 }
 
-/**
- * Collect all image URLs from a variant's digital_assets.
- * Returns { frontImage, allImages }.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function collectVariantImages(v: any): { front: string | null; all: string[] } {
   const all: string[] = [];
@@ -89,17 +83,12 @@ function collectVariantImages(v: any): { front: string | null; all: string[] } {
   return { front, all };
 }
 
-/**
- * Extract the primary product image.
- * Priority: front of first variant → any image of any variant → root digital_assets.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractImage(item: any): string | null {
   for (const v of (item.variants ?? [])) {
     const { front } = collectVariantImages(v);
     if (front) return front;
   }
-  // Root digital_assets fallback
   for (const asset of (item.digital_assets ?? [])) {
     const url  = asset.url ?? null;
     const type = String(asset.type ?? '').toLowerCase();
@@ -109,9 +98,6 @@ function extractImage(item: any): string | null {
   return (fallback && isImageUrl(String(fallback))) ? String(fallback) : null;
 }
 
-/**
- * Collect ALL images across all variants + root digital_assets (deduped).
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractAllImages(item: any): string[] {
   const urls: string[] = [];
@@ -130,14 +116,8 @@ function extractAllImages(item: any): string[] {
   return urls;
 }
 
-/**
- * Extract variants grouped by color.
- * For clothing, each SKU is color+size → we accumulate sizes per color.
- * Each color variant also gets all its images.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractVariants(item: any): Variant[] {
-  // Use a Map keyed by color to accumulate sizes & images
   const byColor = new Map<string, Variant & { images: string[] }>();
 
   for (const v of (item.variants ?? item.variations ?? [])) {
@@ -160,19 +140,15 @@ function extractVariants(item: any): Variant[] {
         sizes:      size ? [String(size)] : [],
       });
     } else {
-      // Same color — accumulate size and images
       const entry = byColor.get(color)!;
-
       if (size) {
         const s = String(size);
         if (!entry.sizes?.includes(s)) entry.sizes = [...(entry.sizes ?? []), s];
       }
-
       const { all } = collectVariantImages(v);
       for (const url of all) {
         if (!entry.images.includes(url)) entry.images.push(url);
       }
-      // Update front image if we have a better one
       if (!entry.image && entry.images.length > 0) entry.image = entry.images[0];
     }
   }
@@ -180,9 +156,6 @@ function extractVariants(item: any): Variant[] {
   return Array.from(byColor.values());
 }
 
-/**
- * Extract all sizes at the product level (aggregated across all color variants).
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractSizes(item: any): string[] {
   const seen = new Set<string>();
@@ -233,7 +206,7 @@ function extractPackaging(item: any): Record<string, unknown> | null {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractMeta(item: any, extraMeta?: Record<string, unknown>): Record<string, unknown> {
+function extractMeta(item: any): Record<string, unknown> {
   const data: Record<string, unknown> = {};
   for (const f of [
     'type_of_products', 'brand', 'number_of_print_positions',
@@ -242,29 +215,15 @@ function extractMeta(item: any, extraMeta?: Record<string, unknown>): Record<str
   ]) {
     if (item[f] != null) data[f] = item[f];
   }
-  return { ...data, ...extraMeta };
+  return data;
 }
 
 // ─── Map product ──────────────────────────────────────────────────────────────
 
-interface PriceEntry { from_qty: number; net_price: number }
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapProduct(item: any, prices?: PriceEntry[], totalStock?: number) {
+function mapProduct(item: any) {
   const ref  = (item.master_code ?? item.masterCode ?? item.sku ?? '').trim();
   const name = (item.product_name ?? item.shortDescription ?? item.name ?? ref).trim();
-
-  // Price: prefer pricelist lowest tier, fallback to catalogue net_price
-  let price = parsePrice(item.net_price ?? item.netPrice ?? item.price);
-  if (prices && prices.length > 0) {
-    const sorted = [...prices].sort((a, b) => a.from_qty - b.from_qty);
-    const lowestTier = sorted[0];
-    if (lowestTier?.net_price != null) price = String(lowestTier.net_price);
-  }
-
-  const extraMeta: Record<string, unknown> = {};
-  if (prices && prices.length > 0) extraMeta.prices = prices;
-  if (totalStock != null)           extraMeta.stock  = totalStock;
 
   return {
     ref,
@@ -272,7 +231,7 @@ function mapProduct(item: any, prices?: PriceEntry[], totalStock?: number) {
     description:     item.short_description  ?? item.shortDescription ?? null,
     longDescription: item.long_description   ?? item.longDescription  ?? item.full_description ?? null,
     category:        item.product_class       ?? item.category_code    ?? item.categoryPath     ?? null,
-    price,
+    price:           parsePrice(item.net_price ?? item.netPrice ?? item.price),
     moq:             parseInt(String(item.moq ?? 50), 10) || 50,
     material:        item.material            ?? null,
     dimensions:      parseDimensions(item),
@@ -291,9 +250,9 @@ function mapProduct(item: any, prices?: PriceEntry[], totalStock?: number) {
       item.printable === 'yes'
     ),
     packaging:       extractPackaging(item),
-    meta:            extractMeta(item, extraMeta),
+    meta:            extractMeta(item),
     source:          'midocean' as const,
-    active:          false,   // admin activates products manually
+    active:          false,
     updatedAt:       new Date(),
   };
 }
@@ -305,79 +264,11 @@ async function fetchCatalogue(cfg: MidoceanConfig): Promise<any[]> {
   const url = `${cfg.baseUrl}/gateway/products/2.0?language=${cfg.lang}`;
   const res = await fetch(url, {
     headers:  { 'x-Gateway-APIKey': cfg.apiKey },
-    redirect: 'follow',   // API returns 303 → S3 ~25 MB
+    redirect: 'follow',
     signal:   AbortSignal.timeout(120_000),
   });
   if (!res.ok) throw new Error(`Midocean API HTTP ${res.status}: ${res.statusText}`);
   return res.json();
-}
-
-// ─── Fetch pricelist ──────────────────────────────────────────────────────────
-
-async function fetchPricelist(cfg: MidoceanConfig): Promise<Map<string, PriceEntry[]>> {
-  const priceMap = new Map<string, PriceEntry[]>();
-  try {
-    const url = `${cfg.baseUrl}/gateway/pricelist/2.0?language=${cfg.lang}`;
-    const res = await fetch(url, {
-      headers: { 'x-Gateway-APIKey': cfg.apiKey },
-      redirect: 'follow',
-      signal:  AbortSignal.timeout(60_000),
-    });
-    if (!res.ok) {
-      console.warn(`[midocean] pricelist HTTP ${res.status} — skipping prices`);
-      return priceMap;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any[] = await res.json();
-    for (const item of data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const masterCode: string = item.master_code ?? item.masterCode ?? '';
-      if (!masterCode) continue;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rawPrices: any[] = item.prices ?? item.price ?? [];
-      const entries: PriceEntry[] = rawPrices
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((p: any) => ({
-          from_qty:  Number(p.from_qty ?? p.fromQty ?? p.qty ?? 1),
-          net_price: Number(p.net_price ?? p.netPrice ?? p.price ?? 0),
-        }))
-        .filter(e => e.net_price > 0);
-      if (entries.length > 0) priceMap.set(masterCode, entries);
-    }
-  } catch (err) {
-    console.warn('[midocean] pricelist fetch error — skipping:', err);
-  }
-  return priceMap;
-}
-
-// ─── Fetch stock ──────────────────────────────────────────────────────────────
-
-async function fetchStock(cfg: MidoceanConfig): Promise<Map<string, number>> {
-  const stockMap = new Map<string, number>();
-  try {
-    const url = `${cfg.baseUrl}/gateway/stock/2.0?language=${cfg.lang}`;
-    const res = await fetch(url, {
-      headers: { 'x-Gateway-APIKey': cfg.apiKey },
-      signal:  AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) {
-      console.warn(`[midocean] stock HTTP ${res.status} — skipping stock`);
-      return stockMap;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any[] = await res.json();
-    for (const item of data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sku: string = item.sku ?? item.masterCode ?? item.master_code ?? '';
-      const qty = Number(item.qty ?? item.quantity ?? item.stock ?? 0);
-      if (sku) {
-        stockMap.set(sku, (stockMap.get(sku) ?? 0) + qty);
-      }
-    }
-  } catch (err) {
-    console.warn('[midocean] stock fetch error — skipping:', err);
-  }
-  return stockMap;
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
@@ -390,44 +281,25 @@ export interface SyncResult {
   skipped: number;
 }
 
-const BATCH_SIZE = 50;
+// Large batches = fewer DB round trips = faster sync within Netlify 26s window
+const BATCH_SIZE  = 500;
+const CONCURRENT  = 3;
 
 export async function syncMidoceanProducts(): Promise<SyncResult> {
   const cfg = await getMidoceanSettings();
   if (!cfg) throw new Error('Clé API Midocean non configurée');
 
-  // Fetch all data sources in parallel
-  const [catalogue, priceMap, stockMap] = await Promise.all([
-    fetchCatalogue(cfg),
-    fetchPricelist(cfg),
-    fetchStock(cfg),
-  ]);
-
+  const catalogue = await fetchCatalogue(cfg);
   const total   = catalogue.length;
   let synced    = 0;
   let errors    = 0;
   let skipped   = 0;
 
-  // Map all products first
+  // Map all products
   const mapped = [];
   for (const item of catalogue) {
     try {
-      const ref       = (item.master_code ?? item.masterCode ?? item.sku ?? '').trim();
-      const prices    = priceMap.get(ref);
-      // Aggregate stock for all SKUs of this product
-      let totalStock: number | undefined;
-      for (const v of (item.variants ?? [])) {
-        const vSku = v.sku ?? '';
-        if (vSku && stockMap.has(vSku)) {
-          totalStock = (totalStock ?? 0) + (stockMap.get(vSku) ?? 0);
-        }
-      }
-      // Also check master_code directly in stock map
-      if (totalStock == null && stockMap.has(ref)) {
-        totalStock = stockMap.get(ref);
-      }
-
-      const m = mapProduct(item, prices, totalStock);
+      const m = mapProduct(item);
       if (!m.ref || !m.name) { skipped++; continue; }
       mapped.push(m);
     } catch (err) {
@@ -436,14 +308,12 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
     }
   }
 
-  // Batch upsert in parallel batches
+  // Batch upsert — 500 items per batch, 3 concurrent
   const batches: (typeof mapped)[] = [];
   for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
     batches.push(mapped.slice(i, i + BATCH_SIZE));
   }
 
-  // Process batches in parallel groups of 5 to avoid overwhelming the DB
-  const CONCURRENT = 5;
   for (let i = 0; i < batches.length; i += CONCURRENT) {
     const group = batches.slice(i, i + CONCURRENT);
     await Promise.all(group.map(async (batch) => {
@@ -475,7 +345,7 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
               meta:            sql`excluded.meta`,
               source:          sql`excluded.source`,
               updatedAt:       new Date(),
-              // active intentionally NOT updated on re-sync
+              // active NOT updated on re-sync
             },
           });
         synced += batch.length;

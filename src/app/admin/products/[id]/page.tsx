@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
-import { products } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { products, categories } from '@/lib/schema';
+import { eq, asc } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import ProductForm from '../ProductForm';
 
@@ -8,5 +8,12 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const [product] = await db.select().from(products).where(eq(products.id, parseInt(id))).limit(1);
   if (!product) notFound();
-  return <ProductForm product={product} />;
+
+  let cats: string[] = [];
+  try {
+    const rows = await db.select({ name: categories.name }).from(categories).orderBy(asc(categories.sortOrder));
+    cats = rows.map(r => r.name);
+  } catch {}
+
+  return <ProductForm product={product} categories={cats} />;
 }

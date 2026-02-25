@@ -49,7 +49,7 @@ export default function MidoceanSync({ lastSync, lastCount }: Props) {
       const res  = await fetch('/api/admin/midocean/test');
       const data = await res.json();
       if (data.ok) {
-        setMessage(`Connexion OK — ${data.count ?? '?'} produits disponibles`);
+        setMessage(data.message ?? 'Connexion API OK');
       } else {
         setIsError(true);
         setMessage(`Erreur : ${data.error}`);

@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { products } from '@/lib/schema';
+import type { Variant } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { imagesArray, priceWithMargin, formatPrice } from '@/lib/utils';
 import { auth } from '@/lib/auth';
 import Link from 'next/link';
-import Image from 'next/image';
+import ImageGallery from './ImageGallery';
 import AddToCartButton from './AddToCartButton';
 import FavoriteButton from './FavoriteButton';
 
@@ -21,13 +22,13 @@ export default async function ProductPage({ params }: { params: Promise<{ ref: s
   const [product] = await db.select().from(products).where(eq(products.ref, ref)).limit(1);
   if (!product || !product.active) notFound();
 
-  const session = await auth();
-  const images  = imagesArray(product);
-  const price   = priceWithMargin(product.price);
-  const variants = (product.variants ?? []) as Array<{ color: string; image?: string; sku?: string; pms_color?: string }>;
-  const colors   = product.colors ? product.colors.split(',').map(c => c.trim()).filter(Boolean) : [];
+  const session  = await auth();
+  const images   = imagesArray(product);
+  const price    = priceWithMargin(product.price);
+  const variants = (product.variants ?? []) as Variant[];
+  const sizes    = (product.sizes   ?? []) as string[];
   const techs    = product.printTechniques ? product.printTechniques.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const meta     = (product.meta ?? {}) as Record<string, string | number | null>;
+  const meta     = (product.meta     ?? {}) as Record<string, string | number | null>;
   const pkg      = (product.packaging ?? {}) as Record<string, string | number | null>;
 
   return (
@@ -42,25 +43,8 @@ export default async function ProductPage({ params }: { params: Promise<{ ref: s
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* Gallery */}
-        <div>
-          <div className="aspect-square bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center mb-3">
-            {images[0] ? (
-              <Image id="main-img" src={images[0]} alt={product.name} width={500} height={500} className="object-contain w-full h-full" />
-            ) : (
-              <span className="text-7xl">🎁</span>
-            )}
-          </div>
-          {images.length > 1 && (
-            <div className="flex gap-2 flex-wrap">
-              {images.slice(0, 8).map((img, i) => (
-                <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-purple-400 transition-colors">
-                  <Image src={img} alt={`${product.name} ${i + 1}`} width={64} height={64} className="object-contain w-full h-full" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Gallery — interactive carousel */}
+        <ImageGallery images={images} name={product.name} />
 
         {/* Info */}
         <div>
@@ -105,21 +89,7 @@ export default async function ProductPage({ params }: { params: Promise<{ ref: s
             </div>
           )}
 
-          {/* Colors */}
-          {(variants.length > 0 || colors.length > 0) && (
-            <div className="mb-4">
-              <div className="text-sm font-semibold text-gray-700 mb-2">Couleurs disponibles</div>
-              <div className="flex flex-wrap gap-2">
-                {(variants.length > 0 ? variants : colors.map(c => ({ color: c }))).map((v, i) => (
-                  <span key={i} className="text-xs border border-gray-200 rounded-full px-3 py-1 bg-white hover:border-purple-400 cursor-default">
-                    {v.color}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Techniques */}
+          {/* Printing techniques */}
           {techs.length > 0 && (
             <div className="mb-4">
               <div className="text-sm font-semibold text-gray-700 mb-2">Techniques d&apos;impression</div>
@@ -150,7 +120,12 @@ export default async function ProductPage({ params }: { params: Promise<{ ref: s
           <div className="flex flex-col sm:flex-row gap-3">
             {session ? (
               <>
-                <AddToCartButton productId={product.id} moq={product.moq ?? 1} />
+                <AddToCartButton
+                  productId={product.id}
+                  moq={product.moq ?? 1}
+                  variants={variants}
+                  sizes={sizes}
+                />
                 <FavoriteButton productId={product.id} />
               </>
             ) : (

@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     try {
       const session = await auth();
       const u = session?.user as { id?: string } | undefined;
-      if (u?.id) userId = parseInt(u.id);
+      const parsed = parseInt(u?.id ?? '');
+      if (parsed > 0) userId = parsed; // skip admin (id='0') — no DB row
     } catch {}
 
     await db.insert(contactMessages).values({
