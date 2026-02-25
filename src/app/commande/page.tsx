@@ -14,7 +14,7 @@ type CartItem = {
 export default function CommandePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [cart, setCart]   = useState<CartItem[]>([]);
+  const [cart, setCart]       = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState('');
@@ -26,7 +26,19 @@ export default function CommandePage() {
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login?redirect=/commande'); return; }
     if (status === 'authenticated') {
-      fetch('/api/cart').then(r => r.json()).then(d => { setCart(d); setLoading(false); });
+      fetch('/api/cart')
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then(d => {
+          setCart(Array.isArray(d) ? d : []);
+          setLoading(false);
+        })
+        .catch(() => {
+          setCart([]);
+          setLoading(false);
+        });
       const u = session?.user as { name?: string; email?: string } | undefined;
       setForm(f => ({ ...f, shippingName: u?.name ?? '', shippingEmail: u?.email ?? '' }));
     }
@@ -37,17 +49,22 @@ export default function CommandePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError('');
-    const res = await fetch('/api/commande', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    if (res.ok) {
-      const d = await res.json();
-      router.push(`/commande/confirmation/${d.orderId}`);
-    } else {
-      const d = await res.json().catch(() => ({}));
-      setError(d.error ?? 'Erreur lors de la commande.');
+    try {
+      const res = await fetch('/api/commande', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        const d = await res.json().catch(() => ({}));
+        router.push(`/commande/confirmation/${d.orderId ?? ''}`);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? 'Erreur lors de la commande.');
+      }
+    } catch {
+      setError('Erreur réseau — veuillez réessayer.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -122,10 +139,10 @@ export default function CommandePage() {
         {/* Récap panier */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 self-start space-y-3">
           <h2 className="font-semibold text-gray-900">Récapitulatif</h2>
-          {cart.map((item: CartItem) => (
+          {cart.map((item) => (
             <div key={item.id} className="flex items-center justify-between text-sm">
               <div>
-                <div className="font-medium text-gray-900 line-clamp-1">{item.product.name}</div>
+                <div className="font-medium text-gray-900 line-clamp-1">{item.product?.name ?? '—'}</div>
                 <div className="text-gray-400 text-xs">x{item.qty}</div>
               </div>
             </div>

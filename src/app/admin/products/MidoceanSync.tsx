@@ -25,8 +25,9 @@ export default function MidoceanSync({ lastSync, lastCount }: Props) {
         setMessage(data.error ?? 'Erreur inconnue');
       } else {
         setMessage(
-          `Synchronisation terminée — ${data.synced} produits importés` +
-          (data.errors > 0 ? ` (${data.errors} erreurs)` : '') +
+          `Synchronisation terminée — ${data.created} produits importés` +
+          (data.errors  > 0 ? `, ${data.errors} erreurs`   : '') +
+          (data.skipped > 0 ? `, ${data.skipped} ignorés`  : '') +
           ` en ${(data.duration / 1000).toFixed(1)}s`
         );
         // Reload to update last sync info

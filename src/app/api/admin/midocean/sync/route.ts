@@ -23,12 +23,12 @@ async function upsertSetting(key: string, value: string) {
 export async function POST() {
   if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   try {
-    const start = Date.now();
+    const start  = Date.now();
     const result = await syncMidoceanProducts();
     const duration = Date.now() - start;
 
     await upsertSetting('midocean_last_sync',  new Date().toISOString());
-    await upsertSetting('midocean_last_count', String(result.synced));
+    await upsertSetting('midocean_last_count', String(result.created));
 
     return NextResponse.json({ ok: true, ...result, duration });
   } catch (err) {
