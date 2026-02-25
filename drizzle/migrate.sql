@@ -185,3 +185,48 @@ VALUES
   ('Très professionnel, devis rapide et produits conformes à nos attentes. Je recommande vivement.', 'Thomas B.', 'BTP Rhône-Alpes', 'TB', 5, 2),
   ('Notre commande de tote bags a été parfaite. Le logo est bien rendu et la qualité est au rendez-vous.', 'Claire D.', 'Association Sportive', 'CD', 5, 3)
 ON CONFLICT DO NOTHING;
+
+-- ─── 13. Nouvelles colonnes orders ───────────────────────────
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS bat_status VARCHAR(20);
+
+-- ─── 14. Nouvelles colonnes cart_items ───────────────────────
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS marking_technique_id INTEGER;
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS marking_position VARCHAR(150);
+
+-- ─── 15. Nouvelles colonnes order_items ──────────────────────
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS marking_technique_id   INTEGER;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS marking_technique_name VARCHAR(100);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS marking_position       VARCHAR(150);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS marking_unit_price     NUMERIC(10,2);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS marking_setup_fee      NUMERIC(10,2);
+
+-- ─── 16. Nouvelles colonnes products ─────────────────────────
+ALTER TABLE products ADD COLUMN IF NOT EXISTS marking_positions     JSON DEFAULT '[]';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS marking_technique_ids JSON DEFAULT '[]';
+
+-- ─── 17. marking_techniques ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS marking_techniques (
+  id          SERIAL PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  description TEXT,
+  unit_price  NUMERIC(10,2) DEFAULT 0,
+  setup_fee   NUMERIC(10,2) DEFAULT 0,
+  active      BOOLEAN       DEFAULT TRUE,
+  sort_order  INTEGER       DEFAULT 0,
+  created_at  TIMESTAMP     DEFAULT NOW()
+);
+
+-- ─── 18. order_exchanges ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS order_exchanges (
+  id               SERIAL PRIMARY KEY,
+  order_id         INTEGER      NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  sender_type      VARCHAR(10)  NOT NULL,
+  user_id          INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+  message          TEXT         NOT NULL,
+  is_bat           BOOLEAN      NOT NULL DEFAULT FALSE,
+  bat_filename     VARCHAR(255),
+  bat_url          VARCHAR(500),
+  bat_status       VARCHAR(20),
+  client_action_at TIMESTAMP,
+  created_at       TIMESTAMP    NOT NULL DEFAULT NOW()
+);

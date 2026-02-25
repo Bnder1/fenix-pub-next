@@ -42,6 +42,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/categories" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
             🗂️ Catégories
           </Link>
+          <Link href="/admin/marking-techniques" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">
+            🖨️ Marquage
+          </Link>
 
           <div className="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">Commerce</div>
           <Link href="/admin/orders" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors">

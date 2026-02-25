@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { cartItems, orders, orderItems, products, settings } from '@/lib/schema';
+import { cartItems, orders, orderItems, products, settings, markingTechniques } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
 function generateOrderNumber(): string {
@@ -38,10 +38,32 @@ export async function POST(req: NextRequest) {
     if (s?.value) margin = parseFloat(s.value);
   } catch {}
 
+  // Fetch marking techniques for cart items that have one
+  const techniqueIds = [...new Set(cart.map(c => c.item.markingTechniqueId).filter(Boolean))] as number[];
+  const techniqueMap = new Map<number, typeof markingTechniques.$inferSelect>();
+  if (techniqueIds.length > 0) {
+    const techs = await db.select().from(markingTechniques).where(
+      eq(markingTechniques.id, techniqueIds[0]) // handled below with loop
+    );
+    // Fetch all needed techniques
+    for (const tid of techniqueIds) {
+      const [t] = await db.select().from(markingTechniques).where(eq(markingTechniques.id, tid)).limit(1);
+      if (t) techniqueMap.set(tid, t);
+    }
+  }
+
   const total = cart.reduce((sum, { item, product }) => {
-    const base = parseFloat(String(product.price ?? 0));
+    const base  = parseFloat(String(product.price ?? 0));
     const price = base * (1 + margin / 100);
-    return sum + price * item.qty;
+    let lineTotal = price * item.qty;
+    if (item.markingTechniqueId) {
+      const tech = techniqueMap.get(item.markingTechniqueId);
+      if (tech) {
+        lineTotal += parseFloat(String(tech.unitPrice ?? 0)) * item.qty
+          + parseFloat(String(tech.setupFee ?? 0));
+      }
+    }
+    return sum + lineTotal;
   }, 0);
 
   // Créer la commande
@@ -63,15 +85,21 @@ export async function POST(req: NextRequest) {
     cart.map(({ item, product }) => {
       const base  = parseFloat(String(product.price ?? 0));
       const price = base * (1 + margin / 100);
+      const tech  = item.markingTechniqueId ? techniqueMap.get(item.markingTechniqueId) : null;
       return {
-        orderId:     order.id,
-        productId:   product.id,
-        productRef:  product.ref,
-        productName: product.name,
-        qty:         item.qty,
-        size:        item.size ?? null,
-        color:       item.color ?? null,
-        unitPrice:   price.toFixed(2),
+        orderId:              order.id,
+        productId:            product.id,
+        productRef:           product.ref,
+        productName:          product.name,
+        qty:                  item.qty,
+        size:                 item.size        ?? null,
+        color:                item.color       ?? null,
+        unitPrice:            price.toFixed(2),
+        markingTechniqueId:   tech?.id         ?? null,
+        markingTechniqueName: tech?.name       ?? null,
+        markingPosition:      item.markingPosition ?? null,
+        markingUnitPrice:     tech ? String(tech.unitPrice) : null,
+        markingSetupFee:      tech ? String(tech.setupFee)  : null,
       };
     })
   );

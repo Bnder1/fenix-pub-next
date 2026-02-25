@@ -2,38 +2,64 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Product } from '@/lib/schema';
+import type { Product, MarkingTechnique } from '@/lib/schema';
 import Image from 'next/image';
 
-export default function ProductForm({ product, categories = [] }: { product?: Product; categories?: string[] }) {
+export default function ProductForm({
+  product,
+  categories  = [],
+  techniques  = [],
+}: {
+  product?:    Product;
+  categories?: string[];
+  techniques?: Pick<MarkingTechnique, 'id' | 'name' | 'unitPrice' | 'setupFee'>[];
+}) {
   const router = useRouter();
   const [form, setForm] = useState({
-    ref:             product?.ref             ?? '',
-    name:            product?.name            ?? '',
-    category:        product?.category        ?? '',
-    price:           product?.price           ?? '',
-    moq:             product?.moq             ?? '',
-    description:     product?.description     ?? '',
-    material:        product?.material        ?? '',
-    dimensions:      product?.dimensions      ?? '',
-    weight:          product?.weight          ?? '',
-    image:           product?.image           ?? '',
-    colors:          product?.colors          ?? '',
-    printTechniques: product?.printTechniques ?? '',
-    source:          product?.source          ?? 'manual',
-    active:          product?.active          ?? true,
+    ref:                 product?.ref                 ?? '',
+    name:                product?.name                ?? '',
+    category:            product?.category            ?? '',
+    price:               product?.price               ?? '',
+    moq:                 product?.moq                 ?? '',
+    description:         product?.description         ?? '',
+    material:            product?.material            ?? '',
+    dimensions:          product?.dimensions          ?? '',
+    weight:              product?.weight              ?? '',
+    image:               product?.image               ?? '',
+    colors:              product?.colors              ?? '',
+    printTechniques:     product?.printTechniques     ?? '',
+    source:              product?.source              ?? 'manual',
+    active:              product?.active              ?? true,
+    markingTechniqueIds: (product?.markingTechniqueIds ?? []) as number[],
+    markingPositions:    ((product?.markingPositions ?? []) as string[]).join('\n'),
   });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
 
   function set(k: string, v: unknown) { setForm(f => ({ ...f, [k]: v })); }
 
+  function toggleTechnique(id: number) {
+    setForm(f => ({
+      ...f,
+      markingTechniqueIds: f.markingTechniqueIds.includes(id)
+        ? f.markingTechniqueIds.filter(x => x !== id)
+        : [...f.markingTechniqueIds, id],
+    }));
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError('');
     const method = product ? 'PUT' : 'POST';
     const url    = product ? `/api/admin/products/${product.id}` : '/api/admin/products';
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+    const payload = {
+      ...form,
+      markingPositions: form.markingPositions
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean),
+    };
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     setSaving(false);
     if (res.ok) {
       router.push('/admin/products');
@@ -149,6 +175,42 @@ export default function ProductForm({ product, categories = [] }: { product?: Pr
             <span className="text-sm font-medium text-gray-700">Actif (visible dans le catalogue)</span>
           </label>
         </div>
+
+        {/* Marquage */}
+        {techniques.length > 0 && (
+          <div className="border-t border-gray-100 pt-4 space-y-3">
+            <div className="text-sm font-semibold text-gray-700">🖨️ Marquage</div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">Techniques disponibles</label>
+              <div className="flex flex-wrap gap-2">
+                {techniques.map(t => (
+                  <label key={t.id} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.markingTechniqueIds.includes(t.id)}
+                      onChange={() => toggleTechnique(t.id)}
+                      className="w-4 h-4 accent-purple-600"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {t.name}
+                      <span className="text-xs text-gray-400 ml-1">({parseFloat(String(t.unitPrice ?? 0)).toFixed(2)} €/u + {parseFloat(String(t.setupFee ?? 0)).toFixed(2)} € calage)</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Positions disponibles (une par ligne)</label>
+              <textarea
+                value={form.markingPositions}
+                onChange={e => set('markingPositions', e.target.value)}
+                rows={3}
+                placeholder={"Avant\nDos\nManche gauche"}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={saving}

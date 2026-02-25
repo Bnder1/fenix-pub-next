@@ -93,6 +93,10 @@ export default async function AccountPage() {
                         o.status === 'cancelled'  ? 'Annulée'         :
                         o.status ?? 'En attente'
                       }</span>
+                      <Link href={`/account/commandes/${o.id}`}
+                        className="text-xs text-purple-700 hover:underline whitespace-nowrap">
+                        Voir →
+                      </Link>
                     </div>
                   </div>
                 ))}

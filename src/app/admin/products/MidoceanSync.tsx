@@ -8,10 +8,11 @@ interface Props {
 }
 
 export default function MidoceanSync({ lastSync, lastCount }: Props) {
-  const [loading,  setLoading]  = useState(false);
-  const [testing,  setTesting]  = useState(false);
-  const [message,  setMessage]  = useState('');
-  const [isError,  setIsError]  = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [testing,       setTesting]       = useState(false);
+  const [syncingPrices, setSyncingPrices] = useState(false);
+  const [message,       setMessage]       = useState('');
+  const [isError,       setIsError]       = useState(false);
 
   async function handleSync() {
     setLoading(true);
@@ -38,6 +39,30 @@ export default function MidoceanSync({ lastSync, lastCount }: Props) {
       setMessage('Erreur réseau');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSyncPrices() {
+    setSyncingPrices(true);
+    setMessage('');
+    setIsError(false);
+    try {
+      const res  = await fetch('/api/admin/midocean/sync-prices', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setIsError(true);
+        setMessage(data.error ?? 'Erreur inconnue');
+      } else {
+        setMessage(
+          `${data.updated} prix mis à jour en ${(data.duration / 1000).toFixed(1)}s` +
+          (data.errors > 0 ? ` (${data.errors} erreurs)` : '')
+        );
+      }
+    } catch {
+      setIsError(true);
+      setMessage('Erreur réseau');
+    } finally {
+      setSyncingPrices(false);
     }
   }
 
@@ -73,17 +98,24 @@ export default function MidoceanSync({ lastSync, lastCount }: Props) {
               : 'Pas encore synchronisé'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleTest}
-            disabled={testing || loading}
+            disabled={testing || loading || syncingPrices}
             className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
           >
             {testing ? 'Test…' : 'Tester la connexion'}
           </button>
           <button
+            onClick={handleSyncPrices}
+            disabled={loading || testing || syncingPrices}
+            className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+          >
+            {syncingPrices ? 'Sync prix…' : 'Sync Prix'}
+          </button>
+          <button
             onClick={handleSync}
-            disabled={loading || testing}
+            disabled={loading || testing || syncingPrices}
             className="px-4 py-1.5 text-xs font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Synchronisation…' : 'Synchroniser'}

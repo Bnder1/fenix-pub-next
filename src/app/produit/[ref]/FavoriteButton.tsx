@@ -37,14 +37,14 @@ export default function FavoriteButton({ productId }: { productId: number }) {
       onClick={toggle}
       disabled={loading}
       aria-label={favorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-      className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl border-2 font-semibold text-sm transition-colors disabled:opacity-60 ${
+      className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 ${
         favorited
-          ? 'bg-pink-50 border-pink-400 text-pink-600 hover:bg-pink-100'
-          : 'border-gray-200 text-gray-500 hover:border-pink-300 hover:text-pink-500'
+          ? 'bg-pink-500 text-white hover:bg-pink-600'
+          : 'bg-gray-100 text-gray-600 hover:bg-pink-50 hover:text-pink-600'
       }`}
     >
-      <span className="text-lg">{favorited ? '❤️' : '🤍'}</span>
-      {favorited ? 'Dans vos favoris' : 'Ajouter aux favoris'}
+      <span>{favorited ? '❤️' : '🤍'}</span>
+      {favorited ? 'Favori' : 'Favoris'}
     </button>
   );
 }

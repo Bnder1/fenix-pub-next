@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { cartItems, products } from '@/lib/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export async function GET() {
   const session = await auth();
@@ -13,6 +13,8 @@ export async function GET() {
       .select({
         id:  cartItems.id,
         qty: cartItems.qty,
+        size:  cartItems.size,
+        color: cartItems.color,
         product: {
           name:  products.name,
           ref:   products.ref,
@@ -35,18 +37,36 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
   try {
     const userId = parseInt((session.user as { id?: string }).id ?? '0');
-    const { productId, qty, color, size } = await req.json();
+    const { productId, qty, color, size, markingTechniqueId, markingPosition } = await req.json();
     if (!productId || !qty) return NextResponse.json({ error: 'productId et qty requis' }, { status: 422 });
 
+    // Uniqueness: userId + productId + size + color
+    const colorCond = color ? eq(cartItems.color, color) : isNull(cartItems.color);
+    const sizeCond  = size  ? eq(cartItems.size,  size)  : isNull(cartItems.size);
+
     const existing = await db.select().from(cartItems)
-      .where(and(eq(cartItems.userId, userId), eq(cartItems.productId, productId)))
+      .where(and(eq(cartItems.userId, userId), eq(cartItems.productId, productId), sizeCond, colorCond))
       .limit(1);
+
     if (existing.length > 0) {
       await db.update(cartItems)
-        .set({ qty: existing[0].qty + qty, color: color ?? existing[0].color, size: size ?? existing[0].size })
+        .set({
+          qty:                existing[0].qty + qty,
+          markingTechniqueId: markingTechniqueId ?? existing[0].markingTechniqueId,
+          markingPosition:    markingPosition    ?? existing[0].markingPosition,
+          updatedAt:          new Date(),
+        })
         .where(eq(cartItems.id, existing[0].id));
     } else {
-      await db.insert(cartItems).values({ userId, productId, qty, color: color ?? null, size: size ?? null });
+      await db.insert(cartItems).values({
+        userId,
+        productId,
+        qty,
+        color:              color              ?? null,
+        size:               size               ?? null,
+        markingTechniqueId: markingTechniqueId ?? null,
+        markingPosition:    markingPosition    ?? null,
+      });
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

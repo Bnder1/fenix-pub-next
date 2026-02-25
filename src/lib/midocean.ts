@@ -359,6 +359,43 @@ export async function syncMidoceanProducts(): Promise<SyncResult> {
   return { total, created: synced, updated: 0, errors, skipped };
 }
 
+// ─── Pricelist sync ──────────────────────────────────────────────────────────
+
+async function fetchPricelist(cfg: MidoceanConfig): Promise<Map<string, string>> {
+  const url = `${cfg.baseUrl}/gateway/price/2.0?language=${cfg.lang}`;
+  const res = await fetch(url, {
+    headers:  { 'x-Gateway-APIKey': cfg.apiKey },
+    redirect: 'follow',
+    signal:   AbortSignal.timeout(120_000),
+  });
+  if (!res.ok) throw new Error(`Pricelist HTTP ${res.status}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await res.json();
+  const map = new Map<string, string>();
+  for (const item of (Array.isArray(data) ? data : [])) {
+    const code  = item.master_code ?? item.masterCode ?? '';
+    const price = parsePrice(item.net_price ?? item.netPrice ?? item.price);
+    if (code && price) map.set(code, price);
+  }
+  return map;
+}
+
+export async function syncMidoceanPrices(): Promise<{ updated: number; errors: number }> {
+  const cfg = await getMidoceanSettings();
+  if (!cfg) throw new Error('Clé API non configurée');
+  const priceMap = await fetchPricelist(cfg);
+  let updated = 0, errors = 0;
+  for (const [ref, price] of priceMap) {
+    try {
+      await db.update(products).set({ price, updatedAt: new Date() }).where(eq(products.ref, ref));
+      updated++;
+    } catch {
+      errors++;
+    }
+  }
+  return { updated, errors };
+}
+
 // ─── Test connection ──────────────────────────────────────────────────────────
 
 export async function testMidoceanConnection(): Promise<{ ok: boolean; message?: string; error?: string }> {

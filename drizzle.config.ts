@@ -5,9 +5,9 @@ export default defineConfig({
   out:       './drizzle',
   dialect:   'postgresql',
   dbCredentials: {
-    // drizzle-kit requires a direct (unpooled) connection
-    url: (process.env.NETLIFY_DATABASE_URL_UNPOOLED
-       ?? process.env.NETLIFY_DATABASE_URL
+    // pooler URL works with pg driver (no WS needed for drizzle-kit)
+    url: (process.env.NETLIFY_DATABASE_URL
+       ?? process.env.NETLIFY_DATABASE_URL_UNPOOLED
        ?? process.env.DATABASE_URL)!,
   },
 });
