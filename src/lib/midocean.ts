@@ -3,13 +3,14 @@
  * Extended to handle clothing variants (color + size per SKU)
  *
  * Endpoints:
- *   Import : GET /gateway/products/2.0?language={lang}  (303 redirect → S3 ~25 MB)
- *   Test   : GET /gateway/stock/2.0?language={lang}
+ *   Import   : GET /gateway/products/2.0?language={lang}  (303 redirect → S3 ~25 MB)
+ *   Pricelist: GET /gateway/pricelist/2.0?language={lang}
+ *   Stock    : GET /gateway/stock/2.0?language={lang}
  */
 import { db } from '@/lib/db';
 import { products, settings } from '@/lib/schema';
 import type { Variant } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -232,7 +233,7 @@ function extractPackaging(item: any): Record<string, unknown> | null {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractMeta(item: any): Record<string, unknown> {
+function extractMeta(item: any, extraMeta?: Record<string, unknown>): Record<string, unknown> {
   const data: Record<string, unknown> = {};
   for (const f of [
     'type_of_products', 'brand', 'number_of_print_positions',
@@ -241,15 +242,29 @@ function extractMeta(item: any): Record<string, unknown> {
   ]) {
     if (item[f] != null) data[f] = item[f];
   }
-  return data;
+  return { ...data, ...extraMeta };
 }
 
 // ─── Map product ──────────────────────────────────────────────────────────────
 
+interface PriceEntry { from_qty: number; net_price: number }
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapProduct(item: any) {
+function mapProduct(item: any, prices?: PriceEntry[], totalStock?: number) {
   const ref  = (item.master_code ?? item.masterCode ?? item.sku ?? '').trim();
   const name = (item.product_name ?? item.shortDescription ?? item.name ?? ref).trim();
+
+  // Price: prefer pricelist lowest tier, fallback to catalogue net_price
+  let price = parsePrice(item.net_price ?? item.netPrice ?? item.price);
+  if (prices && prices.length > 0) {
+    const sorted = [...prices].sort((a, b) => a.from_qty - b.from_qty);
+    const lowestTier = sorted[0];
+    if (lowestTier?.net_price != null) price = String(lowestTier.net_price);
+  }
+
+  const extraMeta: Record<string, unknown> = {};
+  if (prices && prices.length > 0) extraMeta.prices = prices;
+  if (totalStock != null)           extraMeta.stock  = totalStock;
 
   return {
     ref,
@@ -257,7 +272,7 @@ function mapProduct(item: any) {
     description:     item.short_description  ?? item.shortDescription ?? null,
     longDescription: item.long_description   ?? item.longDescription  ?? item.full_description ?? null,
     category:        item.product_class       ?? item.category_code    ?? item.categoryPath     ?? null,
-    price:           parsePrice(item.net_price ?? item.netPrice ?? item.price),
+    price,
     moq:             parseInt(String(item.moq ?? 50), 10) || 50,
     material:        item.material            ?? null,
     dimensions:      parseDimensions(item),
@@ -267,7 +282,7 @@ function mapProduct(item: any) {
     image:           extractImage(item),
     images:          extractAllImages(item),
     variants:        extractVariants(item),
-    sizes:           extractSizes(item),        // product-level size list
+    sizes:           extractSizes(item),
     colors:          extractColors(item),
     printTechniques: extractPrintTechniques(item),
     printable:       !!(
@@ -276,7 +291,7 @@ function mapProduct(item: any) {
       item.printable === 'yes'
     ),
     packaging:       extractPackaging(item),
-    meta:            extractMeta(item),
+    meta:            extractMeta(item, extraMeta),
     source:          'midocean' as const,
     active:          false,   // admin activates products manually
     updatedAt:       new Date(),
@@ -297,6 +312,74 @@ async function fetchCatalogue(cfg: MidoceanConfig): Promise<any[]> {
   return res.json();
 }
 
+// ─── Fetch pricelist ──────────────────────────────────────────────────────────
+
+async function fetchPricelist(cfg: MidoceanConfig): Promise<Map<string, PriceEntry[]>> {
+  const priceMap = new Map<string, PriceEntry[]>();
+  try {
+    const url = `${cfg.baseUrl}/gateway/pricelist/2.0?language=${cfg.lang}`;
+    const res = await fetch(url, {
+      headers: { 'x-Gateway-APIKey': cfg.apiKey },
+      redirect: 'follow',
+      signal:  AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) {
+      console.warn(`[midocean] pricelist HTTP ${res.status} — skipping prices`);
+      return priceMap;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any[] = await res.json();
+    for (const item of data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const masterCode: string = item.master_code ?? item.masterCode ?? '';
+      if (!masterCode) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawPrices: any[] = item.prices ?? item.price ?? [];
+      const entries: PriceEntry[] = rawPrices
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((p: any) => ({
+          from_qty:  Number(p.from_qty ?? p.fromQty ?? p.qty ?? 1),
+          net_price: Number(p.net_price ?? p.netPrice ?? p.price ?? 0),
+        }))
+        .filter(e => e.net_price > 0);
+      if (entries.length > 0) priceMap.set(masterCode, entries);
+    }
+  } catch (err) {
+    console.warn('[midocean] pricelist fetch error — skipping:', err);
+  }
+  return priceMap;
+}
+
+// ─── Fetch stock ──────────────────────────────────────────────────────────────
+
+async function fetchStock(cfg: MidoceanConfig): Promise<Map<string, number>> {
+  const stockMap = new Map<string, number>();
+  try {
+    const url = `${cfg.baseUrl}/gateway/stock/2.0?language=${cfg.lang}`;
+    const res = await fetch(url, {
+      headers: { 'x-Gateway-APIKey': cfg.apiKey },
+      signal:  AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      console.warn(`[midocean] stock HTTP ${res.status} — skipping stock`);
+      return stockMap;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any[] = await res.json();
+    for (const item of data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sku: string = item.sku ?? item.masterCode ?? item.master_code ?? '';
+      const qty = Number(item.qty ?? item.quantity ?? item.stock ?? 0);
+      if (sku) {
+        stockMap.set(sku, (stockMap.get(sku) ?? 0) + qty);
+      }
+    }
+  } catch (err) {
+    console.warn('[midocean] stock fetch error — skipping:', err);
+  }
+  return stockMap;
+}
+
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export interface SyncResult {
@@ -307,57 +390,100 @@ export interface SyncResult {
   skipped: number;
 }
 
+const BATCH_SIZE = 50;
+
 export async function syncMidoceanProducts(): Promise<SyncResult> {
   const cfg = await getMidoceanSettings();
   if (!cfg) throw new Error('Clé API Midocean non configurée');
 
-  const catalogue = await fetchCatalogue(cfg);
+  // Fetch all data sources in parallel
+  const [catalogue, priceMap, stockMap] = await Promise.all([
+    fetchCatalogue(cfg),
+    fetchPricelist(cfg),
+    fetchStock(cfg),
+  ]);
+
   const total   = catalogue.length;
   let synced    = 0;
   let errors    = 0;
   let skipped   = 0;
 
+  // Map all products first
+  const mapped = [];
   for (const item of catalogue) {
     try {
-      const mapped = mapProduct(item);
-      if (!mapped.ref || !mapped.name) { skipped++; continue; }
+      const ref       = (item.master_code ?? item.masterCode ?? item.sku ?? '').trim();
+      const prices    = priceMap.get(ref);
+      // Aggregate stock for all SKUs of this product
+      let totalStock: number | undefined;
+      for (const v of (item.variants ?? [])) {
+        const vSku = v.sku ?? '';
+        if (vSku && stockMap.has(vSku)) {
+          totalStock = (totalStock ?? 0) + (stockMap.get(vSku) ?? 0);
+        }
+      }
+      // Also check master_code directly in stock map
+      if (totalStock == null && stockMap.has(ref)) {
+        totalStock = stockMap.get(ref);
+      }
 
-      await db.insert(products)
-        .values(mapped)
-        .onConflictDoUpdate({
-          target: products.ref,
-          set: {
-            name:            mapped.name,
-            description:     mapped.description,
-            longDescription: mapped.longDescription,
-            category:        mapped.category,
-            price:           mapped.price,
-            moq:             mapped.moq,
-            material:        mapped.material,
-            dimensions:      mapped.dimensions,
-            weight:          mapped.weight,
-            countryOfOrigin: mapped.countryOfOrigin,
-            hsCode:          mapped.hsCode,
-            image:           mapped.image,
-            images:          mapped.images,
-            variants:        mapped.variants,
-            sizes:           mapped.sizes,
-            colors:          mapped.colors,
-            printTechniques: mapped.printTechniques,
-            printable:       mapped.printable,
-            packaging:       mapped.packaging,
-            meta:            mapped.meta,
-            source:          'midocean',
-            updatedAt:       new Date(),
-            // active intentionally NOT updated on re-sync
-          },
-        });
-
-      synced++;
+      const m = mapProduct(item, prices, totalStock);
+      if (!m.ref || !m.name) { skipped++; continue; }
+      mapped.push(m);
     } catch (err) {
-      console.error('[midocean] sync error:', item?.master_code ?? item?.masterCode, err);
+      console.error('[midocean] map error:', item?.master_code ?? item?.masterCode, err);
       errors++;
     }
+  }
+
+  // Batch upsert in parallel batches
+  const batches: (typeof mapped)[] = [];
+  for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
+    batches.push(mapped.slice(i, i + BATCH_SIZE));
+  }
+
+  // Process batches in parallel groups of 5 to avoid overwhelming the DB
+  const CONCURRENT = 5;
+  for (let i = 0; i < batches.length; i += CONCURRENT) {
+    const group = batches.slice(i, i + CONCURRENT);
+    await Promise.all(group.map(async (batch) => {
+      try {
+        await db.insert(products)
+          .values(batch)
+          .onConflictDoUpdate({
+            target: products.ref,
+            set: {
+              name:            sql`excluded.name`,
+              description:     sql`excluded.description`,
+              longDescription: sql`excluded.long_description`,
+              category:        sql`excluded.category`,
+              price:           sql`excluded.price`,
+              moq:             sql`excluded.moq`,
+              material:        sql`excluded.material`,
+              dimensions:      sql`excluded.dimensions`,
+              weight:          sql`excluded.weight`,
+              countryOfOrigin: sql`excluded.country_of_origin`,
+              hsCode:          sql`excluded.hs_code`,
+              image:           sql`excluded.image`,
+              images:          sql`excluded.images`,
+              variants:        sql`excluded.variants`,
+              sizes:           sql`excluded.sizes`,
+              colors:          sql`excluded.colors`,
+              printTechniques: sql`excluded.print_techniques`,
+              printable:       sql`excluded.printable`,
+              packaging:       sql`excluded.packaging`,
+              meta:            sql`excluded.meta`,
+              source:          sql`excluded.source`,
+              updatedAt:       new Date(),
+              // active intentionally NOT updated on re-sync
+            },
+          });
+        synced += batch.length;
+      } catch (err) {
+        console.error('[midocean] batch upsert error:', err);
+        errors += batch.length;
+      }
+    }));
   }
 
   return { total, created: synced, updated: 0, errors, skipped };

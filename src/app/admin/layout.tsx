@@ -79,24 +79,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
         </nav>
 
-        {/* Logout */}
-        <div className="p-3 border-t border-gray-800">
-          <form action={async () => {
-            'use server';
-            await signOut({ redirectTo: '/login' });
-          }}>
-            <button type="submit" className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 hover:text-white transition-colors text-sm text-gray-400">
-              🚪 Déconnexion
-            </button>
-          </form>
-        </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
           <div className="text-sm text-gray-500">Admin — {user.name ?? 'Administrateur'}</div>
-          <Link href="/" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">← Voir le site</Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">← Voir le site</Link>
+            <form action={async () => {
+              'use server';
+              await signOut({ redirectTo: '/login' });
+            }}>
+              <button type="submit" className="text-xs text-gray-400 hover:text-red-600 transition-colors">
+                Déconnexion
+              </button>
+            </form>
+          </div>
         </header>
         <main className="flex-1 p-6 overflow-auto">{children}</main>
       </div>
